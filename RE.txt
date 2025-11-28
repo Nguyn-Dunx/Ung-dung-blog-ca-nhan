@@ -1,0 +1,10 @@
+1. main
+Chỉ chứa code đã chạy tốt, đã test, có thể deploy. ( LƯU Ý: NHÁNH NÀY MỌI NGƯỜI NÊN THỐNG NHẤT TRƯỚC KHI PUSH
+
+2. develop 
+Nơi team merge code hằng ngày.
+Dev frontend/backend đều merge vào đây.
+
+3. feature/*
+Mỗi tính năng, mỗi task có 1 nhánh riêng:
+ví dụ trên github mình đã tạo feature/login thì nhánh này sẽ để code chức năng đăng nhập
