@@ -15,24 +15,25 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(helmet());
-app.use(express.json());
-app.use(xss());
-app.use(morgan("dev"));
+app.use(helmet()); //bảo mật header
+app.use(express.json()); //giúp server hiểu data JSON từ fontend
+app.use(xss()); //Lọc sạch mã độc
+app.use(morgan("dev")); //lưu lại log
 app.use(
+  // config người gọi api
   cors({
     origin: process.env.CORS_ORIGIN || "*",
   })
 );
 
-// Rate limiter (basic)
+// Rate limiter (basic)     giới hạn spam (200rq/min)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200,
 });
 app.use(limiter);
 
-// Routes
+// Routes (endpoint mặc định)
 app.use("/api", routes);
 
 // Error handler (last)
