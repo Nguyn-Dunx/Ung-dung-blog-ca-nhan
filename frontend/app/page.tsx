@@ -1,5 +1,11 @@
-import Image from "next/image";
+import LandingPageNavbar from "@/components/common/LandingPageNavbar";
 
 export default function Home() {
-  return <main></main>;
+  return (
+    <>
+      <div className="container w-full min-h-full bg-white">
+        <LandingPageNavbar />
+      </div>
+    </>
+  );
 }
