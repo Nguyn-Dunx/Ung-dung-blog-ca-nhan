@@ -27,14 +27,14 @@ const LandingPageNavbar = () => {
             <input
               type="text"
               placeholder="Search..."
-              className="w-[35vw] sm:w-[45vw] rounded-full border border-gray-300 py-2 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              className="w-[35vw] sm:w-[45vw] rounded-xl border border-gray-300 py-2 pl-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
             />
 
             {/* SEARCH ICON */}
             <div
               className="
                 absolute right-1 top-1/2 -translate-y-1/2 
-                p-2 rounded-full cursor-pointer transition
+                p-2 rounded-xl cursor-pointer transition
                 hover:bg-indigo-100
               "
             >
