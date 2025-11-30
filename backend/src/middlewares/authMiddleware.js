@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+// Xác thực (Authentication) đăng nhập thành công
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization || "";
@@ -20,6 +21,7 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
+// Phân quyền (Authorization) role = ?
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") return next();
   return res.status(403).json({ message: "Require admin role" });

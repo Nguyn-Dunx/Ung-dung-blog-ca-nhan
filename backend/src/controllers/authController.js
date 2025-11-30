@@ -84,5 +84,42 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// --- HÀM ĐỔI MẬT KHẨU (THÊM MỚI) ---
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // 1. Kiểm tra input
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Vui lòng nhập mật khẩu cũ và mật khẩu mới" });
+    }
+
+    // 2. Lấy ID từ middleware (file authMiddleware.js bạn vừa gửi đã gán req.user)
+    const userId = req.user.id;
+
+    // 3. Tìm user
+    const user = await User.findById(userId);
+    if (!user)
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+
+    // 4. So sánh mật khẩu cũ
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Mật khẩu cũ không chính xác" });
+    }
+
+    // 5. Hash mật khẩu mới và lưu
+    const hashedNew = await bcrypt.hash(newPassword, 10);
+    user.password = hashedNew;
+    await user.save();
+
+    res.status(200).json({ message: "Đổi mật khẩu thành công" });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // --- QUAN TRỌNG: EXPORT TẤT CẢ Ở CUỐI CÙNG ---
-module.exports = { register, login, getAllUsers };
+module.exports = { register, login, getAllUsers, changePassword };

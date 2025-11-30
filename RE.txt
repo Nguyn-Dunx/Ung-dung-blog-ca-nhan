@@ -8,3 +8,4 @@ Dev frontend/backend đều merge vào đây.
 3. feature/*
 Mỗi tính năng, mỗi task có 1 nhánh riêng:
 ví dụ trên github mình đã tạo feature/login thì nhánh này sẽ để code chức năng đăng nhập
+
