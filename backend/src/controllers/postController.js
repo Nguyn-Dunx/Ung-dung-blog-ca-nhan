@@ -20,7 +20,7 @@ const createPost = async (req, res, next) => {
 const getPosts = async (req, res, next) => {
   try {
     const posts = await Post.find()
-      .populate("author", "username email")
+      .populate("author", "username fullName email avatar")
       .sort({ createdAt: -1 });
     res.json(posts);
   } catch (err) {
@@ -32,7 +32,7 @@ const getPost = async (req, res, next) => {
   try {
     const post = await Post.findById(req.params.id).populate(
       "author",
-      "username email"
+      "username fullName email avatar"
     );
     if (!post) return res.status(404).json({ message: "Post not found" });
     res.json(post);
@@ -70,7 +70,7 @@ const deletePost = async (req, res, next) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    await post.deleteOne(); // ERROR maybe
+    await post.deleteOne();
     res.json({ message: "Post deleted" });
   } catch (err) {
     next(err);

@@ -6,8 +6,8 @@ const User = require("../models/User");
 // --- HÀM ĐĂNG KÝ ---
 const register = async (req, res, next) => {
   try {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password)
+    const { username, email, password, fullName, avatar } = req.body;
+    if (!username || !email || !password || !fullName)
       return res.status(400).json({ message: "Missing fields" });
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
@@ -15,7 +15,13 @@ const register = async (req, res, next) => {
       return res.status(400).json({ message: "User already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, password: hashed });
+    const user = await User.create({
+      username,
+      email,
+      password: hashed,
+      fullName,
+      avatar: avatar || undefined, // Nếu không có avatar gửi lên, Mongoose sẽ tự lấy default
+    });
 
     // Tạo token ngay khi đăng ký
     const payload = { id: user._id, role: user.role };
@@ -30,6 +36,8 @@ const register = async (req, res, next) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        fullName: user.fullName,
+        avatar: user.avatar,
         role: user.role,
       },
     });
@@ -56,7 +64,7 @@ const login = async (req, res, next) => {
 
     const payload = { id: user._id, role: user.role };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+      expiresIn: process.env.JWT_EXPIRES_IN || "1d", //thời hạn token
     });
 
     res.json({
@@ -66,6 +74,8 @@ const login = async (req, res, next) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        fullName: user.fullName,
+        avatar: user.avatar,
         role: user.role,
       },
     });
