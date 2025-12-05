@@ -9,6 +9,7 @@ const {
   getAllUsers,
   login,
   changePassword,
+  forgetPassword,
 } = require("../controllers/authController");
 
 router.post("/register", register);
@@ -17,5 +18,6 @@ router.post("/login", login);
 router.get("/users", getAllUsers);
 // Route Đổi mật khẩu (BẮT BUỘC phải có verifyToken đứng trước)
 router.post("/change-password", verifyToken, changePassword);
+router.post("/forget-password", forgetPassword);
 
 module.exports = router;

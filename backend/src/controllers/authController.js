@@ -94,6 +94,46 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// --- QUÊN MẬT KHẨU ---
+const forgetPassword = async (req, res, next) => {
+  try {
+    const { username, email } = req.body;
+
+    if (!username || !email) {
+      return res.status(400).json({
+        message: "Vui lòng nhập đầy đủ username và gmail để lấy lại mật khẩu",
+      });
+    }
+    // kiểm tra user trong Database khớp cả username VÀ email
+    const user = await User.findOne({ username, email });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "Thông tin tài khoản hoặc email không chính xác" });
+    }
+    // tạo pwd tạm thời       // Math.random() tạo số, toString(36) chuyển sang chữ+số, slice(-8) lấy 8 ký tự cuối
+    const temporaryPassword =
+      Math.random().toString(36).slice(-8) +
+      Math.random().toString(36).slice(-8);
+
+    // Mã hóa
+    const hashedTempPassword = await bcrypt.hash(temporaryPassword, 10);
+
+    // Lưu mật khẩu đã mã hóa vào DB
+    user.password = hashedTempPassword;
+    await user.save();
+
+    // Phản hồi lại Client (Trong thực tế, bạn sẽ gửi password này qua Email thay vì trả về JSON)
+    res.status(200).json({
+      message: "Mật khẩu tạm thời đã được tạo thành công",
+      tempPassword: temporaryPassword, // Chỉ dùng để test, thực tế không nên trả về đây
+      note: "Hãy dùng mật khẩu tạm thời này để đăng nhập và đổi lại mật khẩu mới ngay.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 // --- HÀM ĐỔI MẬT KHẨU (THÊM MỚI) ---
 const changePassword = async (req, res, next) => {
   try {
@@ -132,4 +172,10 @@ const changePassword = async (req, res, next) => {
 };
 
 // --- QUAN TRỌNG: EXPORT TẤT CẢ Ở CUỐI CÙNG ---
-module.exports = { register, login, getAllUsers, changePassword };
+module.exports = {
+  register,
+  login,
+  getAllUsers,
+  changePassword,
+  forgetPassword,
+};
