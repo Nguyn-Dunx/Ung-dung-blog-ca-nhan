@@ -64,10 +64,11 @@ const login = async (req, res, next) => {
     const user = await User.findOne({
       $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
     });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) return res.status(400).json({ message: "Not found user!" });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(400).json({ message: "Invalid credentials" });
+    if (!valid)
+      return res.status(400).json({ message: "Password is not valid!" });
     //tạo token
     const payload = { id: user._id, role: user.role };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -78,7 +79,7 @@ const login = async (req, res, next) => {
     res.cookie("token", token, {
       httpOnly: true, // Quan trọng: JS ở client không đọc được (chống XSS)
       secure: false, // false nếu chạy localhost (http), true nếu chạy https (deploy)
-      sameSite: "strict", // Chống CSRF cơ bản
+      sameSite: "lax", // Chống CSRF cơ bản
       maxAge: 24 * 60 * 60 * 1000, // 1 ngày (tính bằng mili giây)
     });
 

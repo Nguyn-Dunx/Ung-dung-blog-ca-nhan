@@ -22,9 +22,9 @@ app.use(cookieParser()); // lưu token vào cookie
 app.use(xss()); //Lọc sạch mã độc
 app.use(morgan("dev")); //lưu lại log
 app.use(
-  // config người gọi api
   cors({
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    credentials: true,
   })
 );
 

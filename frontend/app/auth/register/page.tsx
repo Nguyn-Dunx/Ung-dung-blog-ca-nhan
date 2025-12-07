@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
-import Auth from "../page"; // chỉnh path nếu không đúng
+import Auth from "../page"; // chỉnh lại nếu layout Auth ở chỗ khác
 
 interface RegisterInput {
   name: string;
@@ -18,6 +19,10 @@ interface RegisterInput {
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const router = useRouter();
 
   const {
     register,
@@ -26,8 +31,45 @@ export default function Register() {
     formState: { errors },
   } = useForm<RegisterInput>();
 
-  const onSubmit = (data: RegisterInput) => {
-    console.log(data);
+  const onSubmit = async (data: RegisterInput) => {
+    try {
+      setLoading(true);
+      setServerError(null);
+
+      // map name -> fullName cho đúng với backend
+      const bodyToSend = {
+        fullName: data.name,
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        // avatar: có thể để backend tự dùng default
+      };
+
+      const res = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // QUAN TRỌNG: để browser nhận httpOnly cookie
+        body: JSON.stringify(bodyToSend),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setServerError(json.message || "Register failed");
+        return;
+      }
+
+      // Đăng ký thành công, token đã nằm trong cookie httpOnly
+      // Tuỳ bạn muốn redirect đi đâu
+      router.push("/auth/login"); // hoặc "/"
+    } catch (error) {
+      console.error(error);
+      setServerError("Cannot connect to server");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,7 +83,14 @@ export default function Register() {
             Create a new account
           </h2>
 
-          {/* Name */}
+          {/* Lỗi từ server */}
+          {serverError && (
+            <div className="w-full p-2 text-sm rounded-md bg-red-100 text-red-700">
+              {serverError}
+            </div>
+          )}
+
+          {/* Full name */}
           <div className="flex flex-col gap-1">
             <label htmlFor="nameInput" className="font-medium text-gray-700">
               Full Name
@@ -51,7 +100,9 @@ export default function Register() {
               {...register("name", { required: "Full name is required" })}
               id="nameInput"
               placeholder="Your full name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg 
+                focus:outline-none focus:ring-2 focus:ring-blue-500 
+                placeholder:text-gray-400"
             />
             {errors.name && (
               <span className="text-red-500 text-sm">
@@ -79,7 +130,9 @@ export default function Register() {
               })}
               id="usernameInput"
               placeholder="yourusername"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg 
+                focus:outline-none focus:ring-2 focus:ring-blue-500 
+                placeholder:text-gray-400"
             />
             {errors.username && (
               <span className="text-red-500 text-sm">
@@ -124,7 +177,6 @@ export default function Register() {
             >
               Password
             </label>
-
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -143,7 +195,6 @@ export default function Register() {
                   focus:outline-none focus:ring-2 focus:ring-blue-500 
                   placeholder:text-gray-400"
               />
-
               <span
                 className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500"
                 onClick={() => setShowPassword(!showPassword)}
@@ -151,7 +202,6 @@ export default function Register() {
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
               </span>
             </div>
-
             {errors.password && (
               <span className="text-red-500 text-sm">
                 {errors.password.message}
@@ -159,7 +209,7 @@ export default function Register() {
             )}
           </div>
 
-          {/* Password Confirmation */}
+          {/* Confirm password */}
           <div className="flex flex-col gap-1">
             <label
               htmlFor="passwordConfirmInput"
@@ -167,7 +217,6 @@ export default function Register() {
             >
               Confirm Password
             </label>
-
             <div className="relative">
               <input
                 type={showPasswordConfirm ? "text" : "password"}
@@ -183,7 +232,6 @@ export default function Register() {
                   focus:outline-none focus:ring-2 focus:ring-blue-500 
                   placeholder:text-gray-400"
               />
-
               <span
                 className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500"
                 onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
@@ -191,7 +239,6 @@ export default function Register() {
                 {showPasswordConfirm ? <FaEyeSlash /> : <FaEye />}
               </span>
             </div>
-
             {errors.password_confirmation && (
               <span className="text-red-500 text-sm">
                 {errors.password_confirmation.message}
@@ -202,13 +249,18 @@ export default function Register() {
           {/* Submit */}
           <button
             type="submit"
+            disabled={loading}
             className="w-full py-2 mt-2 bg-blue-600 text-white font-semibold 
-              rounded-lg hover:bg-blue-700 active:scale-[0.98] transition"
+    rounded-lg hover:bg-blue-700 active:scale-[0.98] transition
+    disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Register
+            {loading && (
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            )}
+            {loading ? "Processing..." : "Register"}
           </button>
 
-          {/* Links */}
+          {/* Link sang login */}
           <div className="flex items-center justify-between text-sm mt-2">
             <span className="text-gray-600">
               Already have an account?{" "}
