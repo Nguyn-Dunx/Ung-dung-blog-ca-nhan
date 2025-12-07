@@ -29,9 +29,16 @@ const register = async (req, res, next) => {
       expiresIn: process.env.JWT_EXPIRES_IN || "1d",
     });
 
+    // Cấu hình cookie an toàn hơn
+    res.cookie("token", token, {
+      httpOnly: true, // Quan trọng: JS ở client không đọc được (chống XSS)
+      secure: false, // false nếu chạy localhost (http), true nếu chạy https (deploy)
+      sameSite: "strict", // Chống CSRF cơ bản
+      maxAge: 24 * 60 * 60 * 1000, // 1 ngày (tính bằng mili giây)
+    });
+
     res.status(201).json({
       message: "User created",
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -61,15 +68,22 @@ const login = async (req, res, next) => {
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ message: "Invalid credentials" });
-
+    //tạo token
     const payload = { id: user._id, role: user.role };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "1d", //thời hạn token
     });
 
+    // Cấu hình cookie an toàn hơn
+    res.cookie("token", token, {
+      httpOnly: true, // Quan trọng: JS ở client không đọc được (chống XSS)
+      secure: false, // false nếu chạy localhost (http), true nếu chạy https (deploy)
+      sameSite: "strict", // Chống CSRF cơ bản
+      maxAge: 24 * 60 * 60 * 1000, // 1 ngày (tính bằng mili giây)
+    });
+
     res.json({
       message: "Login success",
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -82,6 +96,11 @@ const login = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+// --- HÀM ĐĂNG XUẤT ---
+const logout = (req, res) => {
+  res.clearCookie("token"); // Xóa cookie tên là "token"
+  res.status(200).json({ message: "Logged out successfully" });
 };
 
 // --- HÀM LẤY DANH SÁCH ---
@@ -178,4 +197,5 @@ module.exports = {
   getAllUsers,
   changePassword,
   forgetPassword,
+  logout,
 };

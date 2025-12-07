@@ -4,10 +4,13 @@ const User = require("../models/User");
 // Xác thực (Authentication) đăng nhập thành công
 const verifyToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : null;
+    // CÁCH CŨ: Lấy từ Header
+    // const authHeader = req.headers.authorization || "";
+    // const token = authHeader.startsWith("Bearer ")
+    //   ? authHeader.split(" ")[1]
+    //   : null;
+    const token = req.cookies.token;
+
     if (!token) return res.status(401).json({ message: "No token provided" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -15,6 +18,7 @@ const verifyToken = async (req, res, next) => {
     req.user = { id: decoded.id, role: decoded.role };
     next();
   } catch (err) {
+    res.clearCookie("token");
     return res
       .status(401)
       .json({ message: "Unauthorized", error: err.message });

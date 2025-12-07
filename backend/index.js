@@ -1,6 +1,7 @@
 // Đây là entry point file
 
 require("dotenv").config();
+const cookieParser = require("cookie-parser");
 const express = require("express");
 const morgan = require("morgan");
 const helmet = require("helmet");
@@ -17,6 +18,7 @@ const PORT = process.env.PORT || 5000;
 // Middlewares
 app.use(helmet()); //bảo mật header
 app.use(express.json()); //giúp server hiểu data JSON từ fontend
+app.use(cookieParser()); // lưu token vào cookie
 app.use(xss()); //Lọc sạch mã độc
 app.use(morgan("dev")); //lưu lại log
 app.use(
