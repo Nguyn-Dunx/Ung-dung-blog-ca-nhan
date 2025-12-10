@@ -11,11 +11,13 @@ const {
   changePassword,
   forgetPassword,
   logout,
+  getCurrentUser,
 } = require("../controllers/authController");
 
 router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
+router.get("/profile", verifyToken, getCurrentUser);
 
 router.get("/users", getAllUsers);
 // Route Đổi mật khẩu (BẮT BUỘC phải có verifyToken đứng trước)
