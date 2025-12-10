@@ -42,33 +42,50 @@
 // app/page.tsx
 import { Post } from "@/lib/types";
 import PostList from "@/components/common/posts/PostList";
+import { cookies } from "next/headers";
 
 // Server Component – gọi API backend
 async function fetchPosts(): Promise<Post[]> {
   try {
+    const cookieStore = await cookies();
     const res = await fetch("http://localhost:5000/api/posts", {
       cache: "no-store",
+      headers: {
+        //  Backend dùng Cookie
+        Cookie: cookieStore.toString(),
+      },
     });
 
     if (!res.ok) {
-      throw new Error("Failed to fetch posts");
+      console.error("❌ Fetch posts failed:", res.status, res.statusText);
+      return [];
     }
 
     const data = await res.json();
 
-    // --- QUAN TRỌNG: LOG ĐỂ KIỂM TRA ---
-    // Bạn hãy nhìn vào Terminal (nơi chạy npm run dev) để xem dòng này in ra gì
+    // DEBUG: Log response để kiểm tra format
     console.log("📦 Data từ Backend gửi về:", data);
 
-    // --- SỬA LỖI Ở ĐÂY ---
-    // Kiểm tra xem backend trả về dạng { posts: [...] } hay { data: [...] }
-    if (data.posts) return data.posts;
-    if (data.data) return data.data;
-    if (Array.isArray(data)) return data; // Trường hợp backend trả thẳng mảng
+    // Kiểm tra xem backend trả về dạng nào
+    if (data.data && Array.isArray(data.data)) {
+      console.log("✅ Response format: { data: [...] }");
+      return data.data;
+    }
 
-    return []; // Trả về mảng rỗng nếu không tìm thấy dữ liệu để tránh lỗi
+    if (data.posts && Array.isArray(data.posts)) {
+      console.log("✅ Response format: { posts: [...] }");
+      return data.posts;
+    }
+
+    if (Array.isArray(data)) {
+      console.log("✅ Response format: [...]");
+      return data;
+    }
+
+    console.warn("⚠️ Unexpected response format:", data);
+    return [];
   } catch (error) {
-    console.error("Lỗi khi fetch posts:", error);
+    console.error("❌ Lỗi khi fetch posts:", error);
     return [];
   }
 }

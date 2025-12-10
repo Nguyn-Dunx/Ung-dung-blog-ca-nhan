@@ -1,35 +1,50 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Post, Comment } from '@/lib/types';
-import { commentsAPI, postsAPI } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from '@/components/ui/card';
-import { Heart, MessageCircle, Eye, Calendar, User, Loader2, Trash2, Edit2 } from 'lucide-react';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { Post, Comment } from "@/lib/types";
+import { commentsAPI, postsAPI } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Heart,
+  MessageCircle,
+  Eye,
+  Calendar,
+  User,
+  Loader2,
+  Trash2,
+  Edit2,
+} from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  if (isNaN(d.getTime())) return "";
+
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-export default function PostDetailClient({ post: initialPost }: { post: Post }) {
+export default function PostDetailClient({
+  post: initialPost,
+  currentUserId,
+}: {
+  post: Post;
+  currentUserId: string | null;
+}) {
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
+  const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
+  const [editingContent, setEditingContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [liked, setLiked] = useState(false);
@@ -37,7 +52,11 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
 
   useEffect(() => {
     loadComments();
-  }, [post._id]);
+    // Check if current user has liked this post
+    if (currentUserId && initialPost.likes) {
+      setLiked(initialPost.likes.includes(currentUserId));
+    }
+  }, [post._id, currentUserId, initialPost.likes]);
 
   const loadComments = async () => {
     try {
@@ -45,22 +64,43 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
       const data = await commentsAPI.getComments(post._id);
       setComments(data);
     } catch (error) {
-      console.error('Error loading comments:', error);
+      console.error("Error loading comments:", error);
     } finally {
       setCommentsLoading(false);
     }
   };
 
   const handleLike = async () => {
+    if (!currentUserId) {
+      router.push("/auth/login");
+      return;
+    }
+
     try {
+      // Optimistic update
+      const newLiked = !liked;
+      setLiked(newLiked);
+
+      // Update likes count immediately
+      setPost((prev) => ({
+        ...prev,
+        likes: newLiked
+          ? [...(prev.likes || []), currentUserId]
+          : (prev.likes || []).filter((id) => id !== currentUserId),
+      }));
+
+      // Call API
       await postsAPI.likePost(post._id);
-      setLiked(!liked);
-      // Refresh to get updated likes count
-      router.refresh();
     } catch (error: any) {
-      console.error('Error liking post:', error);
+      // Revert on error
+      setLiked(!liked);
+      setPost((prev) => ({
+        ...prev,
+        likes: initialPost.likes,
+      }));
+      console.error("Error liking post:", error);
       if (error.response?.status === 401) {
-        router.push('/auth/login');
+        router.push("/auth/login");
       }
     }
   };
@@ -72,11 +112,11 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
       setLoading(true);
       const comment = await commentsAPI.addComment(post._id, newComment);
       setComments([comment, ...comments]);
-      setNewComment('');
+      setNewComment("");
     } catch (error: any) {
-      console.error('Error adding comment:', error);
+      console.error("Error adding comment:", error);
       if (error.response?.status === 401) {
-        router.push('/auth/login');
+        router.push("/auth/login");
       }
     } finally {
       setLoading(false);
@@ -88,25 +128,31 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
 
     try {
       setLoading(true);
-      const updatedComment = await commentsAPI.updateComment(post._id, commentId, editingContent);
-      setComments(comments.map(c => c._id === commentId ? updatedComment : c));
+      const updatedComment = await commentsAPI.updateComment(
+        post._id,
+        commentId,
+        editingContent
+      );
+      setComments(
+        comments.map((c) => (c._id === commentId ? updatedComment : c))
+      );
       setEditingCommentId(null);
-      setEditingContent('');
+      setEditingContent("");
     } catch (error) {
-      console.error('Error editing comment:', error);
+      console.error("Error editing comment:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    if (!confirm('Are you sure you want to delete this comment?')) return;
+    if (!confirm("Are you sure you want to delete this comment?")) return;
 
     try {
       await commentsAPI.deleteComment(post._id, commentId);
-      setComments(comments.filter(c => c._id !== commentId));
+      setComments(comments.filter((c) => c._id !== commentId));
     } catch (error) {
-      console.error('Error deleting comment:', error);
+      console.error("Error deleting comment:", error);
     }
   };
 
@@ -133,7 +179,9 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
                   />
                 ) : (
                   <div className="flex w-full h-full items-center justify-center text-lg font-semibold text-gray-600">
-                    {(post.author.fullName || post.author.username).charAt(0).toUpperCase()}
+                    {(post.author.fullName || post.author.username)
+                      .charAt(0)
+                      .toUpperCase()}
                   </div>
                 )}
               </div>
@@ -149,7 +197,9 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              {post.title}
+            </h1>
 
             {/* Tags */}
             {post.tags && post.tags.length > 0 && (
@@ -189,9 +239,11 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
                 variant="ghost"
                 size="sm"
                 onClick={handleLike}
-                className={liked ? 'text-red-500' : 'text-gray-600'}
+                className={liked ? "text-red-500" : "text-gray-600"}
               >
-                <Heart className={`w-5 h-5 mr-2 ${liked ? 'fill-current' : ''}`} />
+                <Heart
+                  className={`w-5 h-5 mr-2 ${liked ? "fill-current" : ""}`}
+                />
                 {post.likes?.length || 0} Likes
               </Button>
               <div className="flex items-center gap-2 text-gray-600">
@@ -222,14 +274,17 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
                 className="mb-3"
                 rows={3}
               />
-              <Button onClick={handleAddComment} disabled={loading || !newComment.trim()}>
+              <Button
+                onClick={handleAddComment}
+                disabled={loading || !newComment.trim()}
+              >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Posting...
                   </>
                 ) : (
-                  'Post Comment'
+                  "Post Comment"
                 )}
               </Button>
             </div>
@@ -246,9 +301,12 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
             ) : (
               <div className="space-y-4">
                 {comments.map((comment) => (
-                  <div key={comment._id} className="border-b border-gray-200 pb-4 last:border-0">
+                  <div
+                    key={comment._id}
+                    className="border-b border-gray-200 pb-4 last:border-0"
+                  >
                     <div className="flex items-start gap-3">
-                      <div className="relative w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                      <div className="relative w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
                         {comment.user.avatar ? (
                           <Image
                             src={comment.user.avatar}
@@ -258,7 +316,9 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
                           />
                         ) : (
                           <div className="flex w-full h-full items-center justify-center text-sm font-semibold text-gray-600">
-                            {(comment.user.fullName || comment.user.username).charAt(0).toUpperCase()}
+                            {(comment.user.fullName || comment.user.username)
+                              .charAt(0)
+                              .toUpperCase()}
                           </div>
                         )}
                       </div>
@@ -270,33 +330,40 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
                             </span>
                             <span className="text-sm text-gray-500 ml-2">
                               {formatDateTime(comment.createdAt)}
-                              {comment.isEdited && ' (edited)'}
+                              {comment.isEdited && " (edited)"}
                             </span>
                           </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditComment(comment)}
-                              className="h-8 px-2"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteComment(comment._id)}
-                              className="h-8 px-2 text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          {currentUserId &&
+                            currentUserId === comment.user._id && (
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEditComment(comment)}
+                                  className="h-8 px-2"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteComment(comment._id)
+                                  }
+                                  className="h-8 px-2 text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            )}
                         </div>
                         {editingCommentId === comment._id ? (
                           <div className="space-y-2">
                             <Textarea
                               value={editingContent}
-                              onChange={(e) => setEditingContent(e.target.value)}
+                              onChange={(e) =>
+                                setEditingContent(e.target.value)
+                              }
                               rows={2}
                             />
                             <div className="flex gap-2">
@@ -312,7 +379,7 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
                                 variant="outline"
                                 onClick={() => {
                                   setEditingCommentId(null);
-                                  setEditingContent('');
+                                  setEditingContent("");
                                 }}
                               >
                                 Cancel
@@ -333,7 +400,10 @@ export default function PostDetailClient({ post: initialPost }: { post: Post }) 
 
         {/* Back to Home */}
         <div className="mt-6 text-center">
-          <Link href="/" className="text-indigo-600 hover:text-indigo-700 font-medium">
+          <Link
+            href="/"
+            className="text-indigo-600 hover:text-indigo-700 font-medium"
+          >
             ← Back to Home
           </Link>
         </div>

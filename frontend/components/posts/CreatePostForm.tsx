@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Upload, X } from 'lucide-react';
-import { postsAPI } from '@/lib/api';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, Upload, X } from "lucide-react";
+import { postsAPI } from "@/lib/api";
 
 interface PostFormData {
   title: string;
@@ -21,47 +21,92 @@ interface PostFormData {
 export default function CreatePostForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<PostFormData>();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const imageFile = watch('image');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    watch,
+    setValue,
+  } = useForm<PostFormData>();
+
+  const imageFile = watch("image");
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log("🖼️ IMAGE CHANGE EVENT:");
+    console.log("  - Files in input:", e.target.files?.length || 0);
+    console.log("  - File selected:", file ? "YES" : "NO");
+    if (file) {
+      console.log("    - File name:", file.name);
+      console.log("    - File size:", file.size);
+      console.log("    - File type:", file.type);
+    }
+
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Store file in local state (not in react-hook-form)
+      console.log("📌 Storing file in selectedFile state...");
+      setSelectedFile(file);
+      console.log("✅ File stored");
     }
   };
 
   const removeImage = () => {
     setImagePreview(null);
-    setValue('image', undefined);
+    setSelectedFile(null);
+    setValue("image", undefined);
   };
 
   const onSubmit = async (data: PostFormData) => {
     try {
       setLoading(true);
-      setError('');
+      setError("");
+
+      console.log("🔍 CHECKING FORM DATA BEFORE APPEND:");
+      console.log(
+        "  - selectedFile:",
+        selectedFile
+          ? `${selectedFile.name} (${selectedFile.size} bytes)`
+          : "null"
+      );
 
       const formData = new FormData();
-      formData.append('title', data.title);
-      formData.append('content', data.content);
-      formData.append('tags', data.tags);
+      formData.append("title", data.title);
+      formData.append("content", data.content);
+      formData.append("tags", data.tags);
 
-      if (data.image && data.image.length > 0) {
-        formData.append('image', data.image[0]);
+      if (selectedFile) {
+        console.log("✅ File found in selectedFile, appending to FormData");
+        formData.append("image", selectedFile);
+      } else {
+        console.log("❌ NO FILE in selectedFile - skipping image");
+      }
+
+      // DEBUG: Check FormData entries
+      console.log("📤 FORMDATA ENTRIES:");
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  - ${key}: File(${value.name}, ${value.size})`);
+        } else {
+          console.log(`  - ${key}: ${value}`);
+        }
       }
 
       const post = await postsAPI.createPost(formData);
+      console.log("✅ POST CREATED:", post);
       router.push(`/posts/${post._id}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create post');
+      console.error("❌ ERROR:", err);
+      setError(err.response?.data?.message || "Failed to create post");
     } finally {
       setLoading(false);
     }
@@ -83,7 +128,7 @@ export default function CreatePostForm() {
             <Input
               id="title"
               placeholder="Enter post title..."
-              {...register('title', { required: 'Title is required' })}
+              {...register("title", { required: "Title is required" })}
               disabled={loading}
             />
             {errors.title && (
@@ -98,7 +143,7 @@ export default function CreatePostForm() {
               id="content"
               placeholder="Write your post content..."
               rows={12}
-              {...register('content', { required: 'Content is required' })}
+              {...register("content", { required: "Content is required" })}
               disabled={loading}
             />
             {errors.content && (
@@ -112,7 +157,7 @@ export default function CreatePostForm() {
             <Input
               id="tags"
               placeholder="Enter tags separated by commas (e.g., tech, lifestyle, travel)"
-              {...register('tags')}
+              {...register("tags")}
               disabled={loading}
             />
             <p className="text-sm text-gray-500">
@@ -155,7 +200,7 @@ export default function CreatePostForm() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  {...register('image')}
+                  {...register("image")}
                   onChange={handleImageChange}
                   disabled={loading}
                 />
@@ -175,7 +220,7 @@ export default function CreatePostForm() {
                   Creating Post...
                 </>
               ) : (
-                'Publish Post'
+                "Publish Post"
               )}
             </Button>
             <Button

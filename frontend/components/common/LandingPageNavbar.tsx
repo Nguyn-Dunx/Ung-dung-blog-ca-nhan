@@ -4,7 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 
 import { Author } from "@/lib/types";
 
@@ -12,19 +13,78 @@ interface NavbarProps {
   user?: Author | null;
 }
 
-const LandingPageNavbar = ({ user }: NavbarProps) => {
+const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
   const router = useRouter();
+  const [user, setUser] = useState<Author | null | undefined>(initialUser);
+  const [loading, setLoading] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user data on component mount or when initialUser changes
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/auth/profile", {
+          credentials: "include",
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const userObj = data.user || data;
+          setUser({
+            _id: userObj._id,
+            username: userObj.username,
+            email: userObj.email,
+            fullName: userObj.fullName,
+            avatar: userObj.avatar,
+            role: userObj.role,
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error);
+        setUser(initialUser);
+      }
+    };
+
+    // Only fetch if we don't have user or initialUser changed
+    if (!user && !initialUser) {
+      fetchUserData();
+    } else if (initialUser && user?.username !== initialUser.username) {
+      setUser(initialUser);
+    }
+  }, [initialUser]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogout = async () => {
     try {
+      setLoading(true);
       await fetch("http://localhost:5000/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
-      router.refresh();
+      setUser(null);
       router.push("/");
+      router.refresh();
     } catch (error) {
       console.error("Logout error:", error);
+      router.push("/");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -76,24 +136,88 @@ const LandingPageNavbar = ({ user }: NavbarProps) => {
                 </Link>
               </Button>
 
-              <div className="flex items-center gap-2">
-                <Link href="/dashboard">
-                  <div className="h-10 w-10 rounded-full overflow-hidden border border-gray-300">
-                    <img
-                      src={user.avatar || "/default-avatar.png"}
-                      alt={user.fullName || user.username}
-                      className="object-cover h-full w-full"
-                    />
-                  </div>
-                </Link>
+              {user.role === "admin" && (
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="text-gray-600 hover:text-red-600"
+                  asChild
+                  variant="outline"
+                  className="border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <Link href="/admin" className="font-bold">
+                    Admin
+                  </Link>
                 </Button>
+              )}
+
+              <div className="flex items-center gap-2" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center"
+                  title="User menu"
+                >
+                  <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-gray-300 bg-gray-200 flex items-center justify-center hover:border-indigo-600 transition-colors">
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.fullName || user.username}
+                        className="object-cover h-full w-full"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.parentElement!.innerHTML = `<span class="text-lg font-semibold text-gray-600">${(
+                            user.fullName || user.username
+                          )
+                            .charAt(0)
+                            .toUpperCase()}</span>`;
+                        }}
+                      />
+                    ) : (
+                      <span className="text-lg font-semibold text-gray-600">
+                        {(user.fullName || user.username)
+                          .charAt(0)
+                          .toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* User Menu Dropdown */}
+                {showUserMenu && (
+                  <div className="absolute top-14 right-20 bg-white rounded-lg shadow-lg border border-gray-200 w-48 z-50">
+                    <div className="p-4 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {user.fullName || user.username}
+                      </p>
+                      <p className="text-xs text-gray-600">{user.email}</p>
+                    </div>
+                    <nav className="py-2">
+                      <Link
+                        href="/dashboard"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        📊 Dashboard
+                      </Link>
+                      <Link
+                        href="/dashboard/settings"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="w-4 h-4" />
+                        Cài đặt
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          handleLogout();
+                        }}
+                        disabled={loading}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Đăng xuất
+                      </button>
+                    </nav>
+                  </div>
+                )}
               </div>
             </>
           ) : (

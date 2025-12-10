@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Upload, X } from 'lucide-react';
-import { postsAPI } from '@/lib/api';
-import { Post } from '@/lib/types';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, Upload, X } from "lucide-react";
+import { postsAPI } from "@/lib/api";
+import { Post } from "@/lib/types";
 
 interface PostFormData {
   title: string;
@@ -22,15 +22,23 @@ interface PostFormData {
 export default function EditPostForm({ post }: { post: Post }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [imagePreview, setImagePreview] = useState<string | null>(post.image || null);
-  
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm<PostFormData>({
+  const [error, setError] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(
+    post.image || null
+  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+  } = useForm<PostFormData>({
     defaultValues: {
       title: post.title,
       content: post.content,
-      tags: post.tags?.join(', ') || '',
-    }
+      tags: post.tags?.join(", ") || "",
+    },
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,32 +49,43 @@ export default function EditPostForm({ post }: { post: Post }) {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Store file in local state
+      console.log("📌 Storing file in selectedFile state...");
+      setSelectedFile(file);
+      console.log("✅ File stored");
     }
   };
 
   const removeImage = () => {
     setImagePreview(null);
-    setValue('image', undefined);
+    setSelectedFile(null);
+    setValue("image", undefined);
   };
 
   const onSubmit = async (data: PostFormData) => {
     try {
       setLoading(true);
-      setError('');
+      setError("");
 
       const formData = new FormData();
-      formData.append('title', data.title);
-      formData.append('content', data.content);
-      formData.append('tags', data.tags);
+      formData.append("title", data.title);
+      formData.append("content", data.content);
+      formData.append("tags", data.tags);
 
-      if (data.image && data.image.length > 0) {
-        formData.append('image', data.image[0]);
+      if (selectedFile) {
+        console.log("✅ File found, appending to FormData");
+        formData.append("image", selectedFile);
+      } else {
+        console.log("ℹ️ No new file selected - keeping old image");
       }
 
       await postsAPI.updatePost(post._id, formData);
+      console.log("✅ POST UPDATED");
       router.push(`/posts/${post._id}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update post');
+      console.error("❌ ERROR:", err);
+      setError(err.response?.data?.message || "Failed to update post");
     } finally {
       setLoading(false);
     }
@@ -87,7 +106,7 @@ export default function EditPostForm({ post }: { post: Post }) {
             <Input
               id="title"
               placeholder="Enter post title..."
-              {...register('title', { required: 'Title is required' })}
+              {...register("title", { required: "Title is required" })}
               disabled={loading}
             />
             {errors.title && (
@@ -101,7 +120,7 @@ export default function EditPostForm({ post }: { post: Post }) {
               id="content"
               placeholder="Write your post content..."
               rows={12}
-              {...register('content', { required: 'Content is required' })}
+              {...register("content", { required: "Content is required" })}
               disabled={loading}
             />
             {errors.content && (
@@ -114,7 +133,7 @@ export default function EditPostForm({ post }: { post: Post }) {
             <Input
               id="tags"
               placeholder="Enter tags separated by commas"
-              {...register('tags')}
+              {...register("tags")}
               disabled={loading}
             />
           </div>
@@ -153,7 +172,7 @@ export default function EditPostForm({ post }: { post: Post }) {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  {...register('image')}
+                  {...register("image")}
                   onChange={handleImageChange}
                   disabled={loading}
                 />
@@ -169,7 +188,7 @@ export default function EditPostForm({ post }: { post: Post }) {
                   Updating Post...
                 </>
               ) : (
-                'Update Post'
+                "Update Post"
               )}
             </Button>
             <Button

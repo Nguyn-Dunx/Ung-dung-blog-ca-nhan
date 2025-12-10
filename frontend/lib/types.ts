@@ -5,7 +5,7 @@ export type Author = {
   fullName?: string;
   email?: string;
   avatar?: string;
-  role?: 'user' | 'admin';
+  role?: "user" | "admin";
 };
 
 export type User = Author;
@@ -21,6 +21,7 @@ export type Post = {
   likes: string[];
   tags: string[];
   views: number;
+  commentCount?: number;
   createdAt: string;
   updatedAt: string;
 };

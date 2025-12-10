@@ -52,8 +52,10 @@ export default function Login() {
         return;
       }
 
-      router.refresh();
       router.push("/");
+      setTimeout(() => {
+        router.refresh();
+      }, 100);
     } catch (error) {
       console.error("Login Error:", error);
       setServerError("Cannot connect to server. Please try again later.");

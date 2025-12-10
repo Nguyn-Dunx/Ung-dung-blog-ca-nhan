@@ -1,0 +1,324 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Post } from '@/lib/types';
+import { postsAPI, authAPI } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, Edit2, Trash2, Eye, Heart, Users, FileText, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+interface User {
+  _id: string;
+  username: string;
+  email: string;
+  fullName?: string;
+  avatar?: string;
+  role: 'user' | 'admin';
+  createdAt: string;
+}
+
+type TabType = 'posts' | 'users';
+
+export default function AdminDashboardClient({ userId }: { userId: string | null }) {
+  const [activeTab, setActiveTab] = useState<TabType>('posts');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (activeTab === 'posts') {
+      loadPosts();
+    } else {
+      loadUsers();
+    }
+  }, [activeTab]);
+
+  const loadPosts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await postsAPI.getPosts();
+      const postsData = response.data || response.posts || response;
+      const allPosts = Array.isArray(postsData) ? postsData : [];
+      setPosts(allPosts);
+    } catch (err: any) {
+      console.error('Error loading posts:', err);
+      setError('Failed to load posts');
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Assuming there's an endpoint to get all users
+      const response = await fetch('http://localhost:5000/api/auth/users', {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      const data = await response.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error('Error loading users:', err);
+      setError('Failed to load users');
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePost = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+
+    try {
+      setDeletingId(id);
+      await postsAPI.deletePost(id);
+      setPosts(posts.filter(p => p._id !== id));
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || 'Failed to delete post';
+      setError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Manage all posts and users</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6">
+          <Button
+            variant={activeTab === 'posts' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('posts')}
+            className="flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Posts ({posts.length})
+          </Button>
+          <Button
+            variant={activeTab === 'users' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('users')}
+            className="flex items-center gap-2"
+          >
+            <Users className="w-4 h-4" />
+            Users ({users.length})
+          </Button>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <Card className="mb-6 bg-red-50 border-red-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <div>
+                <p className="text-red-800 font-medium">Error</p>
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+              <button 
+                onClick={() => setError(null)}
+                className="ml-auto text-red-600 hover:text-red-800"
+              >
+                ×
+              </button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Posts Tab */}
+        {activeTab === 'posts' && (
+          <div>
+            <div className="mb-6">
+              <Button asChild>
+                <Link href="/posts/create">Create New Post</Link>
+              </Button>
+            </div>
+
+            {posts.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-500 mb-4">No posts found</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {posts.map((post) => (
+                  <Card key={post._id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                    {post.image && (
+                      <div className="relative h-48 w-full bg-gray-200">
+                        <img
+                          src={post.image}
+                          alt={post.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                        {post.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {post.content}
+                      </p>
+
+                      {post.author && (
+                        <div className="flex items-center gap-2 mb-4 pb-4 border-b">
+                          <div className="h-6 w-6 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center shrink-0">
+                            {post.author.avatar ? (
+                              <img
+                                src={post.author.avatar}
+                                alt={post.author.fullName || post.author.username}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs font-semibold text-gray-600">
+                                {(post.author.fullName || post.author.username).charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs">
+                            <p className="font-medium text-gray-800">{post.author.fullName || post.author.username}</p>
+                            {post.createdAt && (
+                              <p className="text-gray-500">
+                                {new Date(post.createdAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                        <div className="flex items-center gap-1">
+                          <Heart className="w-4 h-4" />
+                          <span>{post.likes?.length || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Eye className="w-4 h-4" />
+                          <span>{post.views || 0}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild
+                          className="flex-1"
+                        >
+                          <Link href={`/posts/${post._id}`}>
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild
+                        >
+                          <Link href={`/posts/${post._id}/edit`}>
+                            <Edit2 className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeletePost(post._id)}
+                          disabled={deletingId === post._id}
+                        >
+                          {deletingId === post._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div>
+            {users.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-500">No users found</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Username</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Full Name</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Role</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Joined</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.map((user) => (
+                          <tr key={user._id} className="border-b hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{user.username}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{user.fullName || '-'}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                user.role === 'admin' 
+                                  ? 'bg-purple-100 text-purple-800' 
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {user.role}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {new Date(user.createdAt).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

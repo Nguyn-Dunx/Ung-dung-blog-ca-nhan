@@ -62,8 +62,11 @@ export default function Register() {
       }
 
       // Đăng ký thành công, token đã nằm trong cookie httpOnly
-      // Tuỳ bạn muốn redirect đi đâu
-      router.push("/auth/login"); // hoặc "/"
+      // Redirect đến login
+      router.push("/auth/login");
+      setTimeout(() => {
+        router.refresh();
+      }, 100);
     } catch (error) {
       console.error(error);
       setServerError("Cannot connect to server");

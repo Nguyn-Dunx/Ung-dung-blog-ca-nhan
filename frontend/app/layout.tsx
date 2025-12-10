@@ -18,7 +18,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Personal Blog - Share Your Stories",
-  description: "A minimalist blog platform for sharing your thoughts and stories",
+  description:
+    "A minimalist blog platform for sharing your thoughts and stories",
   icons: {
     icon: "/Logo.png",
   },
@@ -48,9 +49,33 @@ async function getCurrentUser(): Promise<NavbarUser | null> {
     const decoded = jwt.decode(token) as AppJwtPayload | null;
     if (!decoded) return null;
 
+    // Try to fetch full user data from backend to get avatar
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/profile", {
+        headers: {
+          Cookie: `token=${token}`,
+        },
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const userObj = data.user || data;
+        return {
+          _id: userObj._id || decoded.id || "",
+          username: userObj.username || decoded.username || "",
+          fullName: userObj.fullName || decoded.fullName || undefined,
+          avatar: userObj.avatar || undefined,
+        };
+      }
+    } catch (fetchErr) {
+      console.error("Failed to fetch user profile:", fetchErr);
+    }
+
+    // Fallback to JWT data
     return {
-      _id: decoded.id || '',
-      username: decoded.username || '',
+      _id: decoded.id || "",
+      username: decoded.username || "",
       fullName: decoded.fullName || undefined,
       avatar: decoded.avatar || undefined,
     };
