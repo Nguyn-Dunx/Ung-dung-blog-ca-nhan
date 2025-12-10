@@ -80,10 +80,30 @@ const getPosts = async (req, res, next) => {
       Post.countDocuments(query), // Đếm tổng số bài thỏa mãn điều kiện
     ]);
 
-    // 5. Trả về kết quả kèm thông tin phân trang
+    // 5. Lấy comment count cho mỗi post (một lần duy nhất)
+    const Comment = require("../models/Comment");
+    const postIds = posts.map((p) => p._id);
+    const commentCounts = await Comment.aggregate([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: "$post", count: { $sum: 1 } } },
+    ]);
+
+    // Tạo map để dễ lookup
+    const commentCountMap = {};
+    commentCounts.forEach((item) => {
+      commentCountMap[item._id.toString()] = item.count;
+    });
+
+    // Thêm commentCount vào mỗi post
+    const postsWithCommentCount = posts.map((post) => ({
+      ...post.toObject(),
+      commentCount: commentCountMap[post._id.toString()] || 0,
+    }));
+
+    // 6. Trả về kết quả kèm thông tin phân trang
     res.json({
       success: true,
-      data: posts,
+      data: postsWithCommentCount,
       pagination: {
         page,
         limit,

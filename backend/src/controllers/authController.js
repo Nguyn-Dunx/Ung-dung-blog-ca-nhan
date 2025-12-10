@@ -114,6 +114,32 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// --- HÀM LẤY THÔNG TIN USER HIỆN TẠI (PROFILE) ---
+const getCurrentUser = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User profile fetched successfully",
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        avatar: user.avatar,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // --- QUÊN MẬT KHẨU ---
 const forgetPassword = async (req, res, next) => {
   try {
@@ -199,4 +225,5 @@ module.exports = {
   changePassword,
   forgetPassword,
   logout,
+  getCurrentUser,
 };
