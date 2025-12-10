@@ -7,12 +7,15 @@ const {
   getPost,
   updatePost,
   deletePost,
+  likePost,
 } = require("../controllers/postController");
+const upload = require("../middlewares/upload");
 
 router.get("/", getPosts);
 router.get("/:id", getPost);
-router.post("/", verifyToken, createPost);
-router.put("/:id", verifyToken, updatePost);
+router.post("/", verifyToken, upload.single("image"), createPost);
+router.put("/:id", verifyToken, upload.single("image"), updatePost);
 router.delete("/:id", verifyToken, deletePost);
+router.put("/:id/like", verifyToken, likePost);
 
 module.exports = router;
