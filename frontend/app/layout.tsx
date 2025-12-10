@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import LandingPageNavbar from "@/components/common/LandingPageNavbar";
 import { cookies } from "next/headers";
 import jwt, { JwtPayload } from "jsonwebtoken";
 
@@ -28,9 +27,7 @@ interface AppJwtPayload extends JwtPayload {
   avatar?: string;
 }
 
-// 1. Hàm này phải là ASYNC vì cookies() trả về Promise trong Next.js 15
 async function getCurrentUser() {
-  // 2. Phải await cookies() trước khi .get()
   const cookieStore = await cookies();
   const token = cookieStore.get("accessToken")?.value;
 
@@ -38,33 +35,28 @@ async function getCurrentUser() {
 
   try {
     const decoded = jwt.decode(token) as AppJwtPayload | null;
-    if (!decoded) return null;
 
     return {
-      name: decoded.fullName || null,
-      image: decoded.avatar || null,
+      name: decoded?.fullName || null,
+      image: decoded?.avatar || null,
     };
-  } catch (err) {
-    console.error("Failed to decode JWT:", err);
+  } catch {
     return null;
   }
 }
 
-// 3. Layout cũng phải là ASYNC để await được getCurrentUser
 export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   const user = await getCurrentUser();
 
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white`}
-      >
-        <LandingPageNavbar user={user} />
-        <main className="min-h-screen pt-14">{children}</main>
+    <html lang="en" className="mdl-js">
+      <body className={`${geistSans.variable} ${geistMono.variable} bg-white`}>
+        {/* 👇 Không render Navbar tại đây nữa */}
+        {children}
       </body>
     </html>
   );

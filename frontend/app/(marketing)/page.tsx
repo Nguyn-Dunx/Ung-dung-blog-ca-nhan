@@ -1,18 +1,17 @@
-// app/page.tsx
-import { Post } from "@/lib/types";
 import PostList from "@/components/common/posts/PostList";
+import { Post } from "@/lib/types";
 
-// Server Component – gọi API backend
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 async function fetchPosts(): Promise<Post[]> {
-  const res = await fetch("http://localhost:5000/api/posts", {
-    cache: "no-store",
-  });
+  const res = await fetch(`${API_BASE}/api/posts`, { cache: "no-store" });
 
   if (!res.ok) {
-    throw new Error("Failed to fetch posts");
+    return [];
   }
 
-  return res.json();
+  const json = await res.json();
+  return Array.isArray(json.data) ? (json.data as Post[]) : [];
 }
 
 export default async function Home() {
@@ -21,9 +20,6 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto">
-        {/* Navbar đã được render trong RootLayout, không cần gọi lại ở đây */}
-
-        {/* Cột post – căn giữa, ~80% chiều ngang (max-w-3xl tương đương ~768px) */}
         <main className="flex justify-center mt-8 pb-12">
           <PostList posts={posts} />
         </main>

@@ -1,3 +1,4 @@
+// app/auth/login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -5,16 +6,9 @@ import { useForm } from "react-hook-form";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { login, type LoginInput } from "./login";
 
-// Giả sử Auth layout của bạn nằm ở đây, nếu khác hãy sửa lại path
-import Auth from "../page";
-
-interface LoginInput {
-  emailOrUsername: string;
-  password: string;
-}
-
-export default function Login() {
+export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,56 +22,37 @@ export default function Login() {
   } = useForm<LoginInput>();
 
   const onSubmit = async (data: LoginInput) => {
-    try {
-      setLoading(true);
-      setServerError(null);
+    setLoading(true);
+    setServerError(null);
 
-      const res = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // QUAN TRỌNG: Để server set cookie httpOnly vào trình duyệt
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
+    const result = await login(data);
 
-      const json = await res.json();
-
-      if (!res.ok) {
-        // Lấy thông báo lỗi từ backend
-        const errorMessage = json.message || json.error || "Login failed";
-        setServerError(errorMessage);
-        return;
-      }
-
-      // === THÀNH CÔNG ===
-
-      // 1. Refresh router để Layout (Server Component) render lại và cập nhật Navbar
-      router.refresh();
-
-      // 2. Chuyển hướng về trang chủ
-      router.push("/");
-    } catch (error) {
-      console.error("Login Error:", error);
-      setServerError("Cannot connect to server. Please try again later.");
-    } finally {
+    if (!result.ok) {
+      setServerError(result.error || "Login failed");
       setLoading(false);
+      return;
     }
+
+    setLoading(false);
+
+    // Layout / Navbar đọc lại cookie JWT
+    router.refresh();
+
+    // Chuyển sang trang người dùng cá nhân
+    router.push("/dashboard"); // hoặc "/"
   };
 
   return (
-    <Auth>
-      <div className="flex flex-col justify-start px-6 pt-6 w-full">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="flex flex-col justify-start w-full max-w-md">
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="flex flex-col gap-3 w-full"
+          className="flex flex-col gap-3 w-full bg-white rounded-xl shadow-md p-6"
         >
           <h2 className="text-2xl font-semibold text-gray-800 text-center mb-2">
             Login to your account
           </h2>
 
-          {/* Hiển thị lỗi Server nếu có */}
           {serverError && (
             <div className="w-full p-2 text-sm rounded-md bg-red-100 text-red-700 border border-red-200">
               {serverError}
@@ -158,7 +133,7 @@ export default function Login() {
               disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading && (
-              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             )}
             {loading ? "Processing..." : "Login"}
           </button>
@@ -184,6 +159,6 @@ export default function Login() {
           </div>
         </form>
       </div>
-    </Auth>
+    </div>
   );
 }
