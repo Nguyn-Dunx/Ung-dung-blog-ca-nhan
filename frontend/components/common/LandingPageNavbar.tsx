@@ -3,17 +3,31 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 
-interface NavbarUser {
-  name?: string | null;
-  image?: string | null;
-}
+import { Author } from "@/lib/types";
 
 interface NavbarProps {
-  user?: NavbarUser | null;
+  user?: Author | null;
 }
 
 const LandingPageNavbar = ({ user }: NavbarProps) => {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch("http://localhost:5000/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      router.refresh();
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   return (
     <header className="fixed top-0 z-50 w-full bg-white border-b border-b-gray-200 shadow-sm">
       <div className="container flex h-14 items-center justify-between mx-auto px-20">
@@ -57,21 +71,30 @@ const LandingPageNavbar = ({ user }: NavbarProps) => {
                 variant="outline"
                 className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2"
               >
-                <Link href="/create-post" className="font-bold">
+                <Link href="/posts/create" className="font-bold">
                   Create Post
                 </Link>
               </Button>
 
-              <Link href="/dashboard" className="ml-2">
-                <div className="h-10 w-10 rounded-full overflow-hidden border border-gray-300">
-                  {/* Dùng <img> để tránh lỗi domain next/image */}
-                  <img
-                    src={user.image || "/default-avatar.png"}
-                    alt={user.name || "User Avatar"}
-                    className="object-cover h-full w-full"
-                  />
-                </div>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/dashboard">
+                  <div className="h-10 w-10 rounded-full overflow-hidden border border-gray-300">
+                    <img
+                      src={user.avatar || "/default-avatar.png"}
+                      alt={user.fullName || user.username}
+                      className="object-cover h-full w-full"
+                    />
+                  </div>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-gray-600 hover:text-red-600"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
             </>
           ) : (
             // === KHÁCH (CHƯA LOGIN) ===

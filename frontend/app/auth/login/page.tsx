@@ -37,26 +37,22 @@ export default function Login() {
         headers: {
           "Content-Type": "application/json",
         },
-        // QUAN TRỌNG: Để server set cookie httpOnly vào trình duyệt
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          emailOrUsername: data.emailOrUsername,
+          password: data.password,
+        }),
       });
 
       const json = await res.json();
 
       if (!res.ok) {
-        // Lấy thông báo lỗi từ backend
         const errorMessage = json.message || json.error || "Login failed";
         setServerError(errorMessage);
         return;
       }
 
-      // === THÀNH CÔNG ===
-
-      // 1. Refresh router để Layout (Server Component) render lại và cập nhật Navbar
       router.refresh();
-
-      // 2. Chuyển hướng về trang chủ
       router.push("/");
     } catch (error) {
       console.error("Login Error:", error);

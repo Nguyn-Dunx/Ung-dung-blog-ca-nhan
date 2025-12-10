@@ -1,11 +1,14 @@
+"use client";
+
 import Image from "next/image";
+import Link from "next/link";
 import { Post } from "@/lib/types";
+import { Heart, Eye } from "lucide-react";
 
 type PostCardProps = {
   post: Post;
 };
 
-// Format timestamp
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "";
@@ -27,9 +30,11 @@ function formatDateTime(dateStr: string) {
 export default function PostCard({ post }: PostCardProps) {
   const authorName = post.author.fullName || post.author.username;
   const timeLabel = formatDateTime(post.createdAt);
+  const excerpt = post.content?.substring(0, 150) + (post.content?.length > 150 ? '...' : '');
 
   return (
-    <article className="bg-white border border-gray-200 rounded-2xl px-5 py-4 shadow-sm hover:shadow-md transition-shadow duration-150">
+    <Link href={`/posts/${post._id}`}>
+      <article className="bg-white border border-gray-200 rounded-2xl px-5 py-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer">
       {/* Header: avatar + author + timestamp */}
       <div className="flex items-center gap-3 mb-3">
         {/* Avatar (Next Image) */}
@@ -56,10 +61,44 @@ export default function PostCard({ post }: PostCardProps) {
         </div>
       </div>
 
-      {/* Title */}
-      <h2 className="text-lg font-semibold text-gray-900 leading-snug">
-        {post.title}
-      </h2>
-    </article>
+        {/* Title */}
+        <h2 className="text-lg font-semibold text-gray-900 leading-snug mb-2">
+          {post.title}
+        </h2>
+
+        {/* Excerpt */}
+        {excerpt && (
+          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+            {excerpt}
+          </p>
+        )}
+
+        {/* Tags */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {post.tags.slice(0, 3).map((tag, index) => (
+              <span
+                key={index}
+                className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 text-sm text-gray-500">
+          <div className="flex items-center gap-1">
+            <Heart className="w-4 h-4" />
+            <span>{post.likes?.length || 0}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Eye className="w-4 h-4" />
+            <span>{post.views || 0}</span>
+          </div>
+        </div>
+      </article>
+    </Link>
   );
 }

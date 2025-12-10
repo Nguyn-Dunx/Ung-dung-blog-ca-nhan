@@ -1,15 +1,55 @@
-// lib/types.ts
+// User types
 export type Author = {
   _id: string;
   username: string;
   fullName?: string;
   email?: string;
   avatar?: string;
+  role?: 'user' | 'admin';
 };
 
+export type User = Author;
+
+// Post types
 export type Post = {
   _id: string;
   title: string;
-  createdAt: string;
+  content: string;
+  image?: string;
+  imageId?: string;
   author: Author;
+  likes: string[];
+  tags: string[];
+  views: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// Comment types
+export type Comment = {
+  _id: string;
+  post: string;
+  user: Author;
+  content: string;
+  isEdited: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// API Response types
+export type PostsResponse = {
+  success: boolean;
+  data: Post[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalRows: number;
+    totalPages: number;
+  };
+};
+
+export type AuthResponse = {
+  message: string;
+  user: User;
+  token?: string;
 };
