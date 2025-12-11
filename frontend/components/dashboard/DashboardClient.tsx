@@ -5,7 +5,16 @@ import { Post } from "@/lib/types";
 import { postsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Edit2, Trash2, Eye, Heart, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  Edit2,
+  Trash2,
+  Eye,
+  Heart,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -20,30 +29,49 @@ export default function DashboardClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
+  const [allPostsCache, setAllPostsCache] = useState<Post[]>([]);
+  const LIMIT = 10;
   const router = useRouter();
 
   useEffect(() => {
     loadPosts();
-  }, [userId, userRole]);
+  }, [userId, userRole, currentPage]);
 
   const loadPosts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await postsAPI.getPosts();
-      const postsData = response.data || response.posts || response;
+      const response = await postsAPI.getPosts({
+        page: currentPage,
+        limit: LIMIT,
+      });
+      const postsData = response.data || response.posts || [];
+      const pagination = response.pagination || {};
       const allPosts = Array.isArray(postsData) ? postsData : [];
 
       // Filter posts based on user role
-      if (userRole === "admin") {
-        // Admin can see all posts
-        setPosts(allPosts);
-      } else {
+      let filteredPosts = allPosts;
+      if (userRole !== "admin") {
         // Regular users only see their own posts
-        const filteredPosts = allPosts.filter(
+        filteredPosts = allPosts.filter(
           (post) => post.author && post.author._id === userId
         );
-        setPosts(filteredPosts);
+      }
+
+      setPosts(filteredPosts);
+
+      // For admin, use backend pagination
+      if (userRole === "admin") {
+        setTotalPages(pagination.totalPages || 1);
+        setTotalRows(pagination.totalRows || 0);
+      } else {
+        // For regular users, we need to calculate based on filtered posts
+        // This is a limitation - ideally backend should filter by userId
+        setTotalPages(Math.ceil((pagination.totalRows || 0) / LIMIT));
+        setTotalRows(pagination.totalRows || 0);
       }
     } catch (err: any) {
       console.error("Error loading posts:", err);
@@ -67,6 +95,20 @@ export default function DashboardClient({
       alert(errorMsg);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleNext = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -131,111 +173,171 @@ export default function DashboardClient({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {posts.map((post) => (
-              <Card
-                key={post._id}
-                className="overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                {post.image && (
-                  <div className="relative h-48 w-full bg-gray-200">
-                    <img
-                      src={post.image}
-                      alt={post.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
-                )}
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg mb-2 line-clamp-2">
-                    {post.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                    {post.content}
-                  </p>
-
-                  {post.author && (
-                    <div className="flex items-center gap-2 mb-4 pb-4 border-b">
-                      <div className="h-6 w-6 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center shrink-0">
-                        {post.author.avatar ? (
-                          <img
-                            src={post.author.avatar}
-                            alt={post.author.fullName || post.author.username}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs font-semibold text-gray-600">
-                            {(post.author.fullName || post.author.username)
-                              .charAt(0)
-                              .toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs">
-                        <p className="font-medium text-gray-800">
-                          {post.author.fullName || post.author.username}
-                        </p>
-                        {post.createdAt && (
-                          <p className="text-gray-500">
-                            {new Date(post.createdAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
+          <>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {posts.map((post) => (
+                <Card
+                  key={post._id}
+                  className="overflow-hidden hover:shadow-lg transition-shadow"
+                >
+                  {post.image && (
+                    <div className="relative h-48 w-full bg-gray-200">
+                      <img
+                        src={post.image}
+                        alt={post.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
                     </div>
                   )}
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                      {post.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                      {post.content}
+                    </p>
 
-                  <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                    <div className="flex items-center gap-1">
-                      <Heart className="w-4 h-4" />
-                      <span>{post.likes?.length || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Eye className="w-4 h-4" />
-                      <span>{post.views || 0}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      asChild
-                      className="flex-1"
-                    >
-                      <Link href={`/posts/${post._id}`}>
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Link>
-                    </Button>
-                    {canEdit(post) && (
-                      <>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/posts/${post._id}/edit`}>
-                            <Edit2 className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(post._id)}
-                          disabled={deletingId === post._id}
-                        >
-                          {deletingId === post._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                    {post.author && (
+                      <div className="flex items-center gap-2 mb-4 pb-4 border-b">
+                        <div className="h-6 w-6 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center shrink-0">
+                          {post.author.avatar ? (
+                            <img
+                              src={post.author.avatar}
+                              alt={post.author.fullName || post.author.username}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
-                            <Trash2 className="w-4 h-4" />
+                            <span className="text-xs font-semibold text-gray-600">
+                              {(post.author.fullName || post.author.username)
+                                .charAt(0)
+                                .toUpperCase()}
+                            </span>
                           )}
-                        </Button>
-                      </>
+                        </div>
+                        <div className="text-xs">
+                          <p className="font-medium text-gray-800">
+                            {post.author.fullName || post.author.username}
+                          </p>
+                          {post.createdAt && (
+                            <p className="text-gray-500">
+                              {new Date(post.createdAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                      <div className="flex items-center gap-1">
+                        <Heart className="w-4 h-4" />
+                        <span>{post.likes?.length || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Eye className="w-4 h-4" />
+                        <span>{post.views || 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        asChild
+                        className="flex-1"
+                      >
+                        <Link href={`/posts/${post._id}`}>
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Link>
+                      </Button>
+                      {canEdit(post) && (
+                        <>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/posts/${post._id}/edit`}>
+                              <Edit2 className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDelete(post._id)}
+                            disabled={deletingId === post._id}
+                          >
+                            {deletingId === post._id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {posts.length > 0 && (
+              <div className="flex items-center justify-between py-8 border-t">
+                <div className="text-sm text-gray-600">
+                  Trang {currentPage} của {totalPages} ({totalRows} bài viết)
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrevious}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-2"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Trước
+                  </Button>
+
+                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded">
+                    {Array.from({ length: Math.min(5, totalPages) }).map(
+                      (_, i) => {
+                        const pageNum = i + 1;
+                        const isActive = pageNum === currentPage;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 rounded ${
+                              isActive
+                                ? "bg-indigo-600 text-white font-semibold"
+                                : "bg-white text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      }
+                    )}
+                    {totalPages > 5 && (
+                      <span className="text-gray-500">...</span>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNext}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-2"
+                  >
+                    Sau
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

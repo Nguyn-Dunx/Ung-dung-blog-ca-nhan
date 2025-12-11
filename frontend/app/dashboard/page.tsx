@@ -1,32 +1,38 @@
-import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
-import jwt, { JwtPayload } from 'jsonwebtoken';
-import DashboardClient from '@/components/dashboard/DashboardClient';
-
-interface AppJwtPayload extends JwtPayload {
-  id?: string;
-  role?: string;
-}
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import DashboardClient from "../../components/dashboard/DashboardClient";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get('token')?.value;
+  const token = cookieStore.get("token")?.value;
 
   if (!token) {
-    redirect('/auth/login');
+    redirect("/auth/login");
   }
 
-  // Decode token to get user info
+  // Fetch user profile from backend to get user info
   let userId: string | null = null;
-  let userRole: string = 'user';
+  let userRole: string = "user";
 
   try {
-    const decoded = jwt.decode(token) as AppJwtPayload | null;
-    userId = decoded?.id || null;
-    userRole = decoded?.role || 'user';
+    const response = await fetch("http://localhost:5000/api/auth/profile", {
+      headers: {
+        Cookie: cookieStore.toString(),
+      },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const user = data.user || data;
+      userId = user._id || null;
+      userRole = user.role || "user";
+    } else {
+      redirect("/auth/login");
+    }
   } catch (err) {
-    console.error("Failed to decode JWT:", err);
-    redirect('/auth/login');
+    console.error("Failed to fetch user profile:", err);
+    redirect("/auth/login");
   }
 
   return <DashboardClient userId={userId} userRole={userRole} />;
