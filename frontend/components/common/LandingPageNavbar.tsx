@@ -3,8 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import { LogOut, Settings } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { LogOut, Settings, Search, X, Shield } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 import { Author } from "@/lib/types";
@@ -15,10 +15,42 @@ interface NavbarProps {
 
 const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<Author | null | undefined>(initialUser);
   const [loading, setLoading] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Search state
+  const [searchInput, setSearchInput] = useState(
+    searchParams.get("search") || ""
+  );
+
+  // Sync search input with URL params
+  useEffect(() => {
+    setSearchInput(searchParams.get("search") || "");
+  }, [searchParams]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchInput.trim()) {
+      params.set("search", searchInput.trim());
+    } else {
+      params.delete("search");
+    }
+    // Reset page khi search mới
+    params.delete("page");
+    router.push(`/?${params.toString()}`);
+  };
+
+  const clearSearch = () => {
+    setSearchInput("");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("search");
+    params.delete("page");
+    router.push(`/?${params.toString()}`);
+  };
 
   // Fetch user data on component mount or when initialUser changes
   useEffect(() => {
@@ -30,6 +62,7 @@ const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
         if (response.ok) {
           const data = await response.json();
           const userObj = data.user || data;
+          //console.log("Fetched user data:", userObj); // Debug log
           setUser({
             _id: userObj._id,
             username: userObj.username,
@@ -47,12 +80,8 @@ const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
       }
     };
 
-    // Only fetch if we don't have user or initialUser changed
-    if (!user && !initialUser) {
-      fetchUserData();
-    } else if (initialUser && user?.username !== initialUser.username) {
-      setUser(initialUser);
-    }
+    // Always fetch to ensure we have the latest role
+    fetchUserData();
   }, [initialUser]);
 
   // Close menu when clicking outside
@@ -105,19 +134,27 @@ const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
           </Link>
 
           <div className="relative">
-            <input
-              type="text"
-              placeholder="Search..."
-              className="w-[35vw] sm:w-[45vw] rounded-xl border border-gray-300 py-2 pl-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
-            <div className="absolute right-1 top-1/2 -translate-y-1/2 p-2 hover:bg-indigo-100 rounded-xl cursor-pointer">
-              <Image
-                src={"/loupe.png"}
-                alt="Search Icon"
-                width={20}
-                height={20}
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm bài viết..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-[35vw] sm:w-[45vw] rounded-xl border border-gray-300 py-2 pl-10 pr-10 
+                  focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
               />
-            </div>
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 
+                    hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </form>
           </div>
         </div>
 
@@ -142,7 +179,11 @@ const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
                   variant="outline"
                   className="border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-4 py-2"
                 >
-                  <Link href="/admin" className="font-bold">
+                  <Link
+                    href="/admin"
+                    className="font-bold flex items-center gap-2"
+                  >
+                    <Shield className="w-4 h-4" />
                     Admin
                   </Link>
                 </Button>

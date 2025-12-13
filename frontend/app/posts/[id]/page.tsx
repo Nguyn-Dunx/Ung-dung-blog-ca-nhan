@@ -6,6 +6,7 @@ import PostDetailClient from "@/components/posts/PostDetailClient";
 
 interface AppJwtPayload extends JwtPayload {
   id?: string;
+  role?: "guest" | "user" | "admin";
 }
 
 async function fetchPost(id: string): Promise<Post | null> {
@@ -41,15 +42,23 @@ export default async function PostDetailPage({
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
   let currentUserId: string | null = null;
+  let currentUserRole: "guest" | "user" | "admin" | null = null;
 
   if (token) {
     try {
       const decoded = jwt.decode(token) as AppJwtPayload | null;
       currentUserId = decoded?.id || null;
+      currentUserRole = decoded?.role || null;
     } catch (err) {
       console.error("Failed to decode JWT:", err);
     }
   }
 
-  return <PostDetailClient post={post} currentUserId={currentUserId} />;
+  return (
+    <PostDetailClient
+      post={post}
+      currentUserId={currentUserId}
+      currentUserRole={currentUserRole}
+    />
+  );
 }

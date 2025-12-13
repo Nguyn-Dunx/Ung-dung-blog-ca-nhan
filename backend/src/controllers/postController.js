@@ -143,24 +143,15 @@ const updatePost = async (req, res, next) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // Xử lý logic update ảnh mới
-    // if (req.file) {
-    //   // (Optional) Xóa ảnh cũ trên Cloudinary để tiết kiệm dung lượng
-    //   if (post.imageId) {
-    //     await cloudinary.uploader.destroy(post.imageId);
-    //   }
-    //   post.image = req.file.path;
-    //   post.imageId = req.file.filename;
-    // }
-
+    //  --- xoá ảnh cũ trên cloudinary khi update ---
     if (req.file) {
-      console.log("Ảnh cũ ID:", post.imageId); // <--- LOG 1: Xem ID cũ là gì?
+      // console.log("Ảnh cũ ID:", post.imageId);
 
       if (post.imageId) {
-        const result = await cloudinary.uploader.destroy(post.imageId);
-        console.log("Kết quả xóa:", result); // <--- LOG 2: Xem Cloudinary trả lời gì?
+        await cloudinary.uploader.destroy(post.imageId);
+        // console.log("Kết quả xóa:", result);
       } else {
-        console.log("Không tìm thấy imageId để xóa!"); // <--- Khả năng cao nó hiện dòng này
+        // console.log("Không tìm thấy imageId để xóa!");
       }
 
       post.image = req.file.path;
@@ -170,7 +161,7 @@ const updatePost = async (req, res, next) => {
     post.title = req.body.title ?? post.title; // ko có thì gắn cái cũ
     post.content = req.body.content ?? post.content;
 
-    // 3. --- XỬ LÝ TAGS (MỚI) ---
+    //  --- XỬ LÝ TAGS (MỚI) ---
     if (req.body.tags) {
       // Nếu gửi dạng chuỗi "Shark, Tech" -> Tách thành mảng
       if (typeof req.body.tags === "string") {
@@ -201,6 +192,10 @@ const deletePost = async (req, res, next) => {
     if (post.imageId) {
       await cloudinary.uploader.destroy(post.imageId);
     }
+
+    // Xóa tất cả comments của bài viết
+    const Comment = require("../models/Comment");
+    await Comment.deleteMany({ post: req.params.id });
 
     await post.deleteOne();
     res.json({ message: "Post deleted" });

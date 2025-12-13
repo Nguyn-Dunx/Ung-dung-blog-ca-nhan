@@ -6,7 +6,7 @@ const User = require("../models/User");
 // --- HÀM ĐĂNG KÝ ---
 const register = async (req, res, next) => {
   try {
-    const { username, email, password, fullName, avatar } = req.body;
+    const { username, email, password, fullName } = req.body;
     if (!username || !email || !password || !fullName)
       return res.status(400).json({ message: "Missing fields" });
 
@@ -14,13 +14,19 @@ const register = async (req, res, next) => {
     if (existing)
       return res.status(400).json({ message: "User already exists" });
 
+    // --- XỬ LÝ AVATAR (UPLOAD LÊN CLOUDINARY) ---
+    let avatarUrl = undefined; // undefined để Mongoose tự lấy default
+    if (req.file) {
+      avatarUrl = req.file.path; // Link ảnh trên Cloudinary
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({
       username,
       email,
       password: hashed,
       fullName,
-      avatar: avatar || undefined, // Nếu không có avatar gửi lên, Mongoose sẽ tự lấy default
+      avatar: avatarUrl, // Nếu không có avatar gửi lên, Mongoose sẽ tự lấy default
     });
 
     // Tạo token ngay khi đăng ký
@@ -217,6 +223,90 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+// --- ADMIN: SET ROLE CHO USER ---
+const setUserRole = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    // Kiểm tra role hợp lệ
+    const validRoles = ["guest", "user", "admin"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Role không hợp lệ. Chỉ chấp nhận: ${validRoles.join(", ")}`,
+      });
+    }
+
+    // Tìm và cập nhật user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    // Không cho phép admin tự thay đổi role của chính mình
+    if (userId === req.user.id) {
+      return res.status(400).json({
+        message: "Không thể thay đổi role của chính mình",
+      });
+    }
+
+    user.role = role;
+    await user.save();
+
+    res.status(200).json({
+      message: `Đã cập nhật role thành ${role}`,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --- ADMIN: XÓA USER ---
+const deleteUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    // Tìm user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    // Không cho phép admin tự xóa chính mình
+    if (userId === req.user.id) {
+      return res.status(400).json({
+        message: "Không thể xóa tài khoản của chính mình",
+      });
+    }
+
+    // Xóa các bài viết của user (tùy chọn - có thể giữ lại hoặc xóa)
+    const Post = require("../models/Post");
+    const Comment = require("../models/Comment");
+
+    // Xóa tất cả comments của user
+    await Comment.deleteMany({ user: userId });
+
+    // Xóa tất cả posts của user
+    await Post.deleteMany({ author: userId });
+
+    // Xóa user
+    await user.deleteOne();
+
+    res.status(200).json({
+      message: `Đã xóa tài khoản ${user.username} và toàn bộ dữ liệu liên quan`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // --- QUAN TRỌNG: EXPORT TẤT CẢ Ở CUỐI CÙNG ---
 module.exports = {
   register,
@@ -226,4 +316,6 @@ module.exports = {
   forgetPassword,
   logout,
   getCurrentUser,
+  setUserRole,
+  deleteUser,
 };

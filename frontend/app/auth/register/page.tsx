@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaCamera } from "react-icons/fa";
 
 import Auth from "../page"; // chỉnh lại nếu layout Auth ở chỗ khác
 
@@ -22,6 +23,11 @@ export default function Register() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // State cho avatar
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const router = useRouter();
 
   const {
@@ -31,27 +37,44 @@ export default function Register() {
     formState: { errors },
   } = useForm<RegisterInput>();
 
+  // Handler cho việc chọn avatar
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      // Tạo preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setAvatarPreview(previewUrl);
+    }
+  };
+
+  // Handler để mở file picker
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const onSubmit = async (data: RegisterInput) => {
     try {
       setLoading(true);
       setServerError(null);
 
-      // map name -> fullName cho đúng với backend
-      const bodyToSend = {
-        fullName: data.name,
-        username: data.username,
-        email: data.email,
-        password: data.password,
-        // avatar: có thể để backend tự dùng default
-      };
+      // Sử dụng FormData để gửi cả file avatar
+      const formData = new FormData();
+      formData.append("fullName", data.name);
+      formData.append("username", data.username);
+      formData.append("email", data.email);
+      formData.append("password", data.password);
+
+      // Thêm avatar nếu có
+      if (avatarFile) {
+        formData.append("avatar", avatarFile);
+      }
 
       const res = await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        // KHÔNG set Content-Type header khi gửi FormData, browser sẽ tự set
         credentials: "include", // QUAN TRỌNG: để browser nhận httpOnly cookie
-        body: JSON.stringify(bodyToSend),
+        body: formData,
       });
 
       const json = await res.json();
@@ -62,11 +85,8 @@ export default function Register() {
       }
 
       // Đăng ký thành công, token đã nằm trong cookie httpOnly
-      // Redirect đến login
-      router.push("/auth/login");
-      setTimeout(() => {
-        router.refresh();
-      }, 100);
+      // Tuỳ bạn muốn redirect đi đâu
+      router.push("/auth/login"); // hoặc "/"
     } catch (error) {
       console.error(error);
       setServerError("Cannot connect to server");
@@ -85,6 +105,47 @@ export default function Register() {
           <h2 className="text-2xl font-semibold text-gray-800 text-center mb-2">
             Create a new account
           </h2>
+
+          {/* Avatar Upload - Hình tròn, ở trên cùng */}
+          <div className="flex flex-col items-center mb-2">
+            <div
+              onClick={handleAvatarClick}
+              className="relative w-24 h-24 rounded-full border-2 border-dashed border-gray-300 
+                cursor-pointer hover:border-blue-500 transition-colors overflow-hidden
+                flex items-center justify-center bg-gray-50 group"
+            >
+              {avatarPreview ? (
+                <Image
+                  src={avatarPreview}
+                  alt="Avatar preview"
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex flex-col items-center text-gray-400 group-hover:text-blue-500 transition-colors">
+                  <FaCamera className="text-2xl mb-1" />
+                  <span className="text-xs">Add Photo</span>
+                </div>
+              )}
+              {/* Overlay khi hover nếu đã có ảnh */}
+              {avatarPreview && (
+                <div
+                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 
+                  transition-opacity flex items-center justify-center"
+                >
+                  <FaCamera className="text-white text-xl" />
+                </div>
+              )}
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarChange}
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+            />
+            <span className="text-xs text-gray-500 mt-1">Avatar</span>
+          </div>
 
           {/* Lỗi từ server */}
           {serverError && (

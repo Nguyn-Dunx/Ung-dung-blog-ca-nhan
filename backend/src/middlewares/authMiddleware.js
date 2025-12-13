@@ -31,4 +31,15 @@ const isAdmin = (req, res, next) => {
   return res.status(403).json({ message: "Require admin role" });
 };
 
-module.exports = { verifyToken, isAdmin };
+// Kiểm tra có quyền đăng bài không (user hoặc admin, không phải guest)
+const canPost = (req, res, next) => {
+  if (req.user && (req.user.role === "user" || req.user.role === "admin")) {
+    return next();
+  }
+  return res.status(403).json({
+    message:
+      "Tài khoản Guest không được phép đăng bài. Vui lòng liên hệ Admin để nâng cấp tài khoản.",
+  });
+};
+
+module.exports = { verifyToken, isAdmin, canPost };

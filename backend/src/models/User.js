@@ -23,7 +23,11 @@ const userSchema = new mongoose.Schema(
         "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png", // Ảnh mặc định nếu user chưa up
       trim: true,
     },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: {
+      type: String,
+      enum: ["guest", "user", "admin"], // guest: chỉ comment/like, user: đăng bài, admin: quản lý
+      default: "guest",
+    },
   },
   { timestamps: true } //time create , update
 );

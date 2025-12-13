@@ -5,7 +5,7 @@ export type Author = {
   fullName?: string;
   email?: string;
   avatar?: string;
-  role?: "user" | "admin";
+  role?: "guest" | "user" | "admin";
 };
 
 export type User = Author;

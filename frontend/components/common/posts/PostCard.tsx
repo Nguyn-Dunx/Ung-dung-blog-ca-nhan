@@ -2,12 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Post } from "@/lib/types";
+import { postsAPI } from "@/lib/api";
 import { Heart, Eye, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 
 type PostCardProps = {
   post: Post;
+  currentUserId?: string | null;
+  onLikeUpdate?: (postId: string, likes: string[], isLiked: boolean) => void;
 };
 
 function formatDateTime(dateStr: string) {
@@ -28,15 +32,74 @@ function formatDateTime(dateStr: string) {
   return `${time} • ${date}`;
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({
+  post,
+  currentUserId,
+  onLikeUpdate,
+}: PostCardProps) {
   const [commentCount, setCommentCount] = useState<number>(
     post.commentCount || 0
   );
+  const [likes, setLikes] = useState<string[]>(post.likes || []);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeLoading, setLikeLoading] = useState(false);
+  const router = useRouter();
 
   // Comment count được truyền từ backend, không cần fetch riêng
   useEffect(() => {
     setCommentCount(post.commentCount || 0);
   }, [post.commentCount]);
+
+  // Check if current user has liked this post
+  useEffect(() => {
+    if (currentUserId && post.likes) {
+      setIsLiked(post.likes.includes(currentUserId));
+      setLikes(post.likes);
+    }
+  }, [currentUserId, post.likes]);
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Ngăn Link navigate
+    e.stopPropagation(); // Ngăn event bubble up
+
+    if (!currentUserId) {
+      router.push("/auth/login");
+      return;
+    }
+
+    try {
+      setLikeLoading(true);
+      // Optimistic update
+      const newIsLiked = !isLiked;
+      setIsLiked(newIsLiked);
+      const newLikes = newIsLiked
+        ? [...likes, currentUserId]
+        : likes.filter((id) => id !== currentUserId);
+      setLikes(newLikes);
+
+      // Call API
+      const response = await postsAPI.likePost(post._id);
+
+      // Update với data từ server
+      setLikes(response.likes || newLikes);
+      setIsLiked(response.isLiked);
+
+      // Callback để parent component cập nhật nếu cần
+      if (onLikeUpdate) {
+        onLikeUpdate(post._id, response.likes, response.isLiked);
+      }
+    } catch (error: any) {
+      // Revert on error
+      setIsLiked(!isLiked);
+      setLikes(post.likes || []);
+      console.error("Error liking post:", error);
+      if (error.response?.status === 401) {
+        router.push("/auth/login");
+      }
+    } finally {
+      setLikeLoading(false);
+    }
+  };
 
   const authorName = post.author.fullName || post.author.username;
   const timeLabel = formatDateTime(post.createdAt);
@@ -109,10 +172,17 @@ export default function PostCard({ post }: PostCardProps) {
 
         {/* Stats */}
         <div className="flex items-center gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-1">
-            <Heart className="w-4 h-4" />
-            <span>{post.likes?.length || 0}</span>
-          </div>
+          <button
+            onClick={handleLike}
+            disabled={likeLoading}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all duration-200
+              hover:bg-red-50 active:scale-95
+              ${isLiked ? "text-red-500" : "text-gray-500 hover:text-red-500"}
+              ${likeLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+            <span>{likes.length}</span>
+          </button>
           <div className="flex items-center gap-1">
             <Eye className="w-4 h-4" />
             <span>{post.views || 0}</span>

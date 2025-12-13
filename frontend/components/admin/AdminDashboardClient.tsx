@@ -1,13 +1,24 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Post } from '@/lib/types';
-import { postsAPI, authAPI } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Edit2, Trash2, Eye, Heart, Users, FileText, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { Post } from "@/lib/types";
+import { postsAPI, adminAPI } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Loader2,
+  Edit2,
+  Trash2,
+  Eye,
+  Heart,
+  Users,
+  FileText,
+  AlertCircle,
+  Shield,
+  UserX,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface User {
   _id: string;
@@ -15,23 +26,29 @@ interface User {
   email: string;
   fullName?: string;
   avatar?: string;
-  role: 'user' | 'admin';
+  role: "guest" | "user" | "admin";
   createdAt: string;
 }
 
-type TabType = 'posts' | 'users';
+type TabType = "posts" | "users";
 
-export default function AdminDashboardClient({ userId }: { userId: string | null }) {
-  const [activeTab, setActiveTab] = useState<TabType>('posts');
+export default function AdminDashboardClient({
+  userId,
+}: {
+  userId: string | null;
+}) {
+  const [activeTab, setActiveTab] = useState<TabType>("posts");
   const [posts, setPosts] = useState<Post[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    if (activeTab === 'posts') {
+    if (activeTab === "posts") {
       loadPosts();
     } else {
       loadUsers();
@@ -47,8 +64,8 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
       const allPosts = Array.isArray(postsData) ? postsData : [];
       setPosts(allPosts);
     } catch (err: any) {
-      console.error('Error loading posts:', err);
-      setError('Failed to load posts');
+      console.error("Error loading posts:", err);
+      setError("Failed to load posts");
       setPosts([]);
     } finally {
       setLoading(false);
@@ -59,33 +76,81 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
     try {
       setLoading(true);
       setError(null);
-      // Assuming there's an endpoint to get all users
-      const response = await fetch('http://localhost:5000/api/auth/users', {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-      const data = await response.json();
+      const data = await adminAPI.getUsers();
       setUsers(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('Error loading users:', err);
-      setError('Failed to load users');
+      console.error("Error loading users:", err);
+      setError("Failed to load users");
       setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Xử lý thay đổi role
+  const handleChangeRole = async (targetUserId: string, newRole: string) => {
+    if (targetUserId === userId) {
+      alert("Không thể thay đổi role của chính mình!");
+      return;
+    }
+
+    try {
+      setChangingRoleId(targetUserId);
+      await adminAPI.setUserRole(targetUserId, newRole);
+      // Cập nhật local state
+      setUsers(
+        users.map((u) =>
+          u._id === targetUserId
+            ? { ...u, role: newRole as "guest" | "user" | "admin" }
+            : u
+        )
+      );
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || "Failed to change role";
+      setError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setChangingRoleId(null);
+    }
+  };
+
+  // Xử lý xóa user
+  const handleDeleteUser = async (targetUserId: string, username: string) => {
+    if (targetUserId === userId) {
+      alert("Không thể xóa tài khoản của chính mình!");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Bạn có chắc muốn xóa tài khoản "${username}"? Hành động này sẽ xóa toàn bộ bài viết và bình luận của người dùng này.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingUserId(targetUserId);
+      await adminAPI.deleteUser(targetUserId);
+      setUsers(users.filter((u) => u._id !== targetUserId));
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || "Failed to delete user";
+      setError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   const handleDeletePost = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this post?')) return;
+    if (!confirm("Are you sure you want to delete this post?")) return;
 
     try {
       setDeletingId(id);
       await postsAPI.deletePost(id);
-      setPosts(posts.filter(p => p._id !== id));
+      setPosts(posts.filter((p) => p._id !== id));
     } catch (err: any) {
-      const errorMsg = err.response?.data?.message || 'Failed to delete post';
+      const errorMsg = err.response?.data?.message || "Failed to delete post";
       setError(errorMsg);
       alert(errorMsg);
     } finally {
@@ -106,23 +171,25 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Admin Dashboard
+          </h1>
           <p className="text-gray-600">Manage all posts and users</p>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-4 mb-6">
           <Button
-            variant={activeTab === 'posts' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('posts')}
+            variant={activeTab === "posts" ? "default" : "outline"}
+            onClick={() => setActiveTab("posts")}
             className="flex items-center gap-2"
           >
             <FileText className="w-4 h-4" />
             Posts ({posts.length})
           </Button>
           <Button
-            variant={activeTab === 'users' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('users')}
+            variant={activeTab === "users" ? "default" : "outline"}
+            onClick={() => setActiveTab("users")}
             className="flex items-center gap-2"
           >
             <Users className="w-4 h-4" />
@@ -139,7 +206,7 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
                 <p className="text-red-800 font-medium">Error</p>
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
-              <button 
+              <button
                 onClick={() => setError(null)}
                 className="ml-auto text-red-600 hover:text-red-800"
               >
@@ -150,7 +217,7 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
         )}
 
         {/* Posts Tab */}
-        {activeTab === 'posts' && (
+        {activeTab === "posts" && (
           <div>
             <div className="mb-6">
               <Button asChild>
@@ -167,7 +234,10 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {posts.map((post) => (
-                  <Card key={post._id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <Card
+                    key={post._id}
+                    className="overflow-hidden hover:shadow-lg transition-shadow"
+                  >
                     {post.image && (
                       <div className="relative h-48 w-full bg-gray-200">
                         <img
@@ -175,7 +245,7 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
                           alt={post.title}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.style.display = "none";
                           }}
                         />
                       </div>
@@ -194,17 +264,23 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
                             {post.author.avatar ? (
                               <img
                                 src={post.author.avatar}
-                                alt={post.author.fullName || post.author.username}
+                                alt={
+                                  post.author.fullName || post.author.username
+                                }
                                 className="w-full h-full object-cover"
                               />
                             ) : (
                               <span className="text-xs font-semibold text-gray-600">
-                                {(post.author.fullName || post.author.username).charAt(0).toUpperCase()}
+                                {(post.author.fullName || post.author.username)
+                                  .charAt(0)
+                                  .toUpperCase()}
                               </span>
                             )}
                           </div>
                           <div className="text-xs">
-                            <p className="font-medium text-gray-800">{post.author.fullName || post.author.username}</p>
+                            <p className="font-medium text-gray-800">
+                              {post.author.fullName || post.author.username}
+                            </p>
                             {post.createdAt && (
                               <p className="text-gray-500">
                                 {new Date(post.createdAt).toLocaleDateString()}
@@ -237,11 +313,7 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
                             View
                           </Link>
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                        >
+                        <Button size="sm" variant="outline" asChild>
                           <Link href={`/posts/${post._id}/edit`}>
                             <Edit2 className="w-4 h-4" />
                           </Link>
@@ -268,7 +340,7 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
         )}
 
         {/* Users Tab */}
-        {activeTab === 'users' && (
+        {activeTab === "users" && (
           <div>
             {users.length === 0 ? (
               <Card>
@@ -283,30 +355,106 @@ export default function AdminDashboardClient({ userId }: { userId: string | null
                     <table className="w-full">
                       <thead>
                         <tr className="border-b bg-gray-50">
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Username</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Full Name</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Role</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Joined</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Username
+                          </th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Full Name
+                          </th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Role
+                          </th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Joined
+                          </th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {users.map((user) => (
-                          <tr key={user._id} className="border-b hover:bg-gray-50">
-                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{user.username}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{user.fullName || '-'}</td>
+                          <tr
+                            key={user._id}
+                            className={`border-b hover:bg-gray-50 ${
+                              user._id === userId ? "bg-indigo-50" : ""
+                            }`}
+                          >
+                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                              <div className="flex items-center gap-2">
+                                {user.username}
+                                {user._id === userId && (
+                                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
+                                    Bạn
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {user.email}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {user.fullName || "-"}
+                            </td>
                             <td className="px-6 py-4 text-sm">
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                user.role === 'admin' 
-                                  ? 'bg-purple-100 text-purple-800' 
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}>
-                                {user.role}
-                              </span>
+                              {user._id === userId ? (
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800`}
+                                >
+                                  {user.role}
+                                </span>
+                              ) : (
+                                <select
+                                  value={user.role}
+                                  onChange={(e) =>
+                                    handleChangeRole(user._id, e.target.value)
+                                  }
+                                  disabled={changingRoleId === user._id}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer
+                                    ${
+                                      user.role === "admin"
+                                        ? "bg-purple-100 text-purple-800 border-purple-300"
+                                        : user.role === "guest"
+                                        ? "bg-gray-100 text-gray-800 border-gray-300"
+                                        : "bg-blue-100 text-blue-800 border-blue-300"
+                                    }
+                                    ${
+                                      changingRoleId === user._id
+                                        ? "opacity-50"
+                                        : "hover:opacity-80"
+                                    }
+                                  `}
+                                >
+                                  <option value="guest">Guest</option>
+                                  <option value="user">User</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
                               {new Date(user.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              {user._id !== userId && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() =>
+                                    handleDeleteUser(user._id, user.username)
+                                  }
+                                  disabled={deletingUserId === user._id}
+                                  className="h-8"
+                                >
+                                  {deletingUserId === user._id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <UserX className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         ))}

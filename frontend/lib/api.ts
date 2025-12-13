@@ -122,4 +122,22 @@ export const commentsAPI = {
   },
 };
 
+// Admin API
+export const adminAPI = {
+  getUsers: async () => {
+    const response = await api.get("/auth/users");
+    return response.data;
+  },
+
+  setUserRole: async (userId: string, role: string) => {
+    const response = await api.put(`/auth/users/${userId}/role`, { role });
+    return response.data;
+  },
+
+  deleteUser: async (userId: string) => {
+    const response = await api.delete(`/auth/users/${userId}`);
+    return response.data;
+  },
+};
+
 export default api;

@@ -36,9 +36,11 @@ function formatDateTime(dateStr: string) {
 export default function PostDetailClient({
   post: initialPost,
   currentUserId,
+  currentUserRole,
 }: {
   post: Post;
   currentUserId: string | null;
+  currentUserRole: "guest" | "user" | "admin" | null;
 }) {
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -333,9 +335,10 @@ export default function PostDetailClient({
                               {comment.isEdited && " (edited)"}
                             </span>
                           </div>
-                          {currentUserId &&
-                            currentUserId === comment.user._id && (
-                              <div className="flex gap-2">
+                          {/* Action buttons: Edit (owner only) + Delete (owner, admin, or post author) */}
+                          <div className="flex gap-1">
+                            {currentUserId &&
+                              currentUserId === comment.user._id && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -344,6 +347,11 @@ export default function PostDetailClient({
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </Button>
+                              )}
+                            {currentUserId &&
+                              (currentUserId === comment.user._id ||
+                                currentUserRole === "admin" ||
+                                post.author._id === currentUserId) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -354,8 +362,8 @@ export default function PostDetailClient({
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
-                              </div>
-                            )}
+                              )}
+                          </div>
                         </div>
                         {editingCommentId === comment._id ? (
                           <div className="space-y-2">

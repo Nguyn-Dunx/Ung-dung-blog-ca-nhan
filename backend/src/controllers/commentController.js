@@ -44,12 +44,23 @@ const deleteComment = async (req, res, next) => {
     const comment = await Comment.findById(req.params.id);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-    // Logic phân quyền:
-    // Cho phép xóa nếu: (Là người viết comment đó) HOẶC (Là Admin)
-    if (comment.user.toString() !== req.user.id && req.user.role !== "admin") {
+    // Lấy thông tin bài viết để kiểm tra tác giả
+    const post = await Post.findById(comment.post);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    // Logic phân quyền xóa comment:
+    // Cho phép xóa nếu:
+    // 1. Là người viết comment đó
+    // 2. Là Admin
+    // 3. Là tác giả của bài viết (chủ bài viết có quyền xóa comment trong bài của mình)
+    const isCommentOwner = comment.user.toString() === req.user.id;
+    const isAdmin = req.user.role === "admin";
+    const isPostAuthor = post.author.toString() === req.user.id;
+
+    if (!isCommentOwner && !isAdmin && !isPostAuthor) {
       return res
         .status(403)
-        .json({ message: "Not allowed to delete this comment" });
+        .json({ message: "Bạn không có quyền xóa bình luận này" });
     }
 
     await comment.deleteOne();
