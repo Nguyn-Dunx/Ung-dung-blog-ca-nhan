@@ -11,14 +11,14 @@ import {
   MessageCircle,
   Eye,
   Calendar,
-  User,
-  Loader2,
-  Trash2,
   Edit2,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
@@ -42,6 +42,14 @@ export default function PostDetailClient({
   currentUserId: string | null;
   currentUserRole: "guest" | "user" | "admin" | null;
 }) {
+  const router = useRouter();
+
+  // --- AUTH CONTEXT ---
+  const { user } = useAuth();
+  const effectiveUserId = user?._id ?? currentUserId;
+  const effectiveRole = user?.role ?? currentUserRole ?? "guest";
+
+  // --- STATES ---
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -50,15 +58,15 @@ export default function PostDetailClient({
   const [loading, setLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [liked, setLiked] = useState(false);
-  const router = useRouter();
 
+  // --- LOAD COMMENTS + LIKE STATUS ---
   useEffect(() => {
     loadComments();
-    // Check if current user has liked this post
-    if (currentUserId && initialPost.likes) {
-      setLiked(initialPost.likes.includes(currentUserId));
+
+    if (effectiveUserId && initialPost.likes) {
+      setLiked(initialPost.likes.includes(effectiveUserId));
     }
-  }, [post._id, currentUserId, initialPost.likes]);
+  }, [post._id, effectiveUserId, initialPost.likes]);
 
   const loadComments = async () => {
     try {
@@ -72,42 +80,32 @@ export default function PostDetailClient({
     }
   };
 
+  // --- LIKE ---
   const handleLike = async () => {
-    if (!currentUserId) {
-      router.push("/auth/login");
-      return;
-    }
+    if (!effectiveUserId) return router.push("/auth/login");
 
     try {
-      // Optimistic update
       const newLiked = !liked;
       setLiked(newLiked);
 
-      // Update likes count immediately
       setPost((prev) => ({
         ...prev,
         likes: newLiked
-          ? [...(prev.likes || []), currentUserId]
-          : (prev.likes || []).filter((id) => id !== currentUserId),
+          ? [...(prev.likes || []), effectiveUserId]
+          : (prev.likes || []).filter((id) => id !== effectiveUserId),
       }));
 
-      // Call API
       await postsAPI.likePost(post._id);
     } catch (error: any) {
-      // Revert on error
-      setLiked(!liked);
-      setPost((prev) => ({
-        ...prev,
-        likes: initialPost.likes,
-      }));
       console.error("Error liking post:", error);
-      if (error.response?.status === 401) {
-        router.push("/auth/login");
-      }
+      setLiked(!liked);
+      setPost((prev) => ({ ...prev, likes: initialPost.likes }));
     }
   };
 
+  // --- ADD COMMENT ---
   const handleAddComment = async () => {
+    if (!effectiveUserId) return router.push("/auth/login");
     if (!newComment.trim()) return;
 
     try {
@@ -117,14 +115,13 @@ export default function PostDetailClient({
       setNewComment("");
     } catch (error: any) {
       console.error("Error adding comment:", error);
-      if (error.response?.status === 401) {
-        router.push("/auth/login");
-      }
+      if (error.response?.status === 401) router.push("/auth/login");
     } finally {
       setLoading(false);
     }
   };
 
+  // --- UPDATE COMMENT ---
   const handleEditComment = async (commentId: string) => {
     if (!editingContent.trim()) return;
 
@@ -135,6 +132,7 @@ export default function PostDetailClient({
         commentId,
         editingContent
       );
+
       setComments(
         comments.map((c) => (c._id === commentId ? updatedComment : c))
       );
@@ -147,6 +145,7 @@ export default function PostDetailClient({
     }
   };
 
+  // --- DELETE COMMENT ---
   const handleDeleteComment = async (commentId: string) => {
     if (!confirm("Are you sure you want to delete this comment?")) return;
 
@@ -166,10 +165,10 @@ export default function PostDetailClient({
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        {/* Post Header */}
+        {/* ==== POST HEADER ==== */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            {/* Author Info */}
+            {/* Author */}
             <div className="flex items-center gap-3 mb-4">
               <div className="relative w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
                 {post.author.avatar ? (
@@ -187,6 +186,7 @@ export default function PostDetailClient({
                   </div>
                 )}
               </div>
+
               <div>
                 <p className="font-semibold text-gray-900">
                   {post.author.fullName || post.author.username}
@@ -204,7 +204,7 @@ export default function PostDetailClient({
             </h1>
 
             {/* Tags */}
-            {post.tags && post.tags.length > 0 && (
+            {post.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {post.tags.map((tag, index) => (
                   <span
@@ -217,7 +217,7 @@ export default function PostDetailClient({
               </div>
             )}
 
-            {/* Featured Image */}
+            {/* Image */}
             {post.image && (
               <div className="relative w-full h-96 mb-6 rounded-lg overflow-hidden">
                 <img
@@ -235,7 +235,7 @@ export default function PostDetailClient({
               </p>
             </div>
 
-            {/* Stats */}
+            {/* STATS */}
             <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
               <Button
                 variant="ghost"
@@ -248,10 +248,12 @@ export default function PostDetailClient({
                 />
                 {post.likes?.length || 0} Likes
               </Button>
+
               <div className="flex items-center gap-2 text-gray-600">
                 <MessageCircle className="w-5 h-5" />
                 <span>{comments.length} Comments</span>
               </div>
+
               <div className="flex items-center gap-2 text-gray-600">
                 <Eye className="w-5 h-5" />
                 <span>{post.views} Views</span>
@@ -260,14 +262,14 @@ export default function PostDetailClient({
           </CardContent>
         </Card>
 
-        {/* Comments Section */}
+        {/* ==== COMMENTS ==== */}
         <Card>
           <CardContent className="pt-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               Comments ({comments.length})
             </h2>
 
-            {/* Add Comment Form */}
+            {/* Add comment */}
             <div className="mb-6">
               <Textarea
                 placeholder="Write a comment..."
@@ -291,15 +293,13 @@ export default function PostDetailClient({
               </Button>
             </div>
 
-            {/* Comments List */}
+            {/* Comments */}
             {commentsLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               </div>
             ) : comments.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">
-                No comments yet. Be the first to comment!
-              </p>
+              <p className="text-center text-gray-500 py-8">No comments yet.</p>
             ) : (
               <div className="space-y-4">
                 {comments.map((comment) => (
@@ -308,6 +308,7 @@ export default function PostDetailClient({
                     className="border-b border-gray-200 pb-4 last:border-0"
                   >
                     <div className="flex items-start gap-3">
+                      {/* Avatar */}
                       <div className="relative w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
                         {comment.user.avatar ? (
                           <Image
@@ -324,6 +325,8 @@ export default function PostDetailClient({
                           </div>
                         )}
                       </div>
+
+                      {/* Content */}
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <div>
@@ -335,44 +338,43 @@ export default function PostDetailClient({
                               {comment.isEdited && " (edited)"}
                             </span>
                           </div>
-                          {/* Action buttons: Edit (owner only) + Delete (owner, admin, or post author) */}
+
+                          {/* Edit/Delete */}
                           <div className="flex gap-1">
-                            {currentUserId &&
-                              currentUserId === comment.user._id && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => startEditComment(comment)}
-                                  className="h-8 px-2"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            {currentUserId &&
-                              (currentUserId === comment.user._id ||
-                                currentUserRole === "admin" ||
-                                post.author._id === currentUserId) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleDeleteComment(comment._id)
-                                  }
-                                  className="h-8 px-2 text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
+                            {effectiveUserId === comment.user._id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEditComment(comment)}
+                                className="h-8 px-2"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                            )}
+
+                            {(effectiveUserId === comment.user._id ||
+                              effectiveRole === "admin" ||
+                              post.author._id === effectiveUserId) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteComment(comment._id)}
+                                className="h-8 px-2 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
+
                         {editingCommentId === comment._id ? (
                           <div className="space-y-2">
                             <Textarea
                               value={editingContent}
+                              rows={2}
                               onChange={(e) =>
                                 setEditingContent(e.target.value)
                               }
-                              rows={2}
                             />
                             <div className="flex gap-2">
                               <Button
@@ -406,7 +408,7 @@ export default function PostDetailClient({
           </CardContent>
         </Card>
 
-        {/* Back to Home */}
+        {/* Back to home */}
         <div className="mt-6 text-center">
           <Link
             href="/"
