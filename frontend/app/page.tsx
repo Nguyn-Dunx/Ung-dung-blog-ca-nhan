@@ -4,7 +4,7 @@
 
 // // Server Component – gọi API backend
 // async function fetchPosts(): Promise<Post[]> {
-//   const res = await fetch("http://localhost:5000/api/posts", {
+//   const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/posts", {
 //     cache: "no-store",
 //   });
 
@@ -48,7 +48,7 @@ import { cookies } from "next/headers";
 async function fetchPosts(): Promise<Post[]> {
   try {
     const cookieStore = await cookies();
-    const res = await fetch("http://localhost:5000/api/posts", {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/posts`, {
       cache: "no-store",
       headers: {
         //  Backend dùng Cookie

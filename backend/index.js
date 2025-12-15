@@ -24,6 +24,9 @@ app.use(morgan("dev")); //lưu lại log
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin:
+      process.env.CORS_ORIGIN ||
+      "https://equivalve-subreputable-keiko.ngrok-free.dev",
     credentials: true,
   })
 );

@@ -37,7 +37,7 @@ export default function ForgotPassword() {
       setTempPassword(null);
 
       const res = await fetch(
-        "http://localhost:5000/api/auth/forget-password",
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/forget-password`,
         {
           method: "POST",
           headers: {

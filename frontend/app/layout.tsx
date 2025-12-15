@@ -51,12 +51,15 @@ async function getCurrentUser(): Promise<NavbarUser | null> {
 
     // Try to fetch full user data from backend to get avatar
     try {
-      const response = await fetch("http://localhost:5000/api/auth/profile", {
-        headers: {
-          Cookie: `token=${token}`,
-        },
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/profile`,
+        {
+          headers: {
+            Cookie: `token=${token}`,
+          },
+          cache: "no-store",
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();

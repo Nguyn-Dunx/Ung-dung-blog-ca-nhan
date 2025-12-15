@@ -56,9 +56,12 @@ const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/auth/profile", {
-          credentials: "include",
-        });
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/auth/profile`,
+          {
+            credentials: "include",
+          }
+        );
         if (response.ok) {
           const data = await response.json();
           const userObj = data.user || data;
@@ -102,7 +105,7 @@ const LandingPageNavbar = ({ user: initialUser }: NavbarProps) => {
   const handleLogout = async () => {
     try {
       setLoading(true);
-      await fetch("http://localhost:5000/api/auth/logout", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
