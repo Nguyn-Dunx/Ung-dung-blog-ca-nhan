@@ -5,7 +5,7 @@ import EditPostForm from "@/components/posts/EditPostForm";
 
 async function fetchPost(id: string): Promise<Post | null> {
   try {
-    const res = await fetch(`http://localhost:5000/api/posts/${id}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/posts/${id}`, {
       cache: "no-store",
     });
 

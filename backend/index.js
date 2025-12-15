@@ -21,12 +21,22 @@ app.use(express.json()); //giúp server hiểu data JSON từ fontend
 app.use(cookieParser()); // lưu token vào cookie
 app.use(xss()); //Lọc sạch mã độc
 app.use(morgan("dev")); //lưu lại log
+// app.use(
+//   cors({
+//     origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+//     origin:
+//       process.env.CORS_ORIGIN ||
+//       "https://equivalve-subreputable-keiko.ngrok-free.dev",
+//     credentials: true,
+//   })
+// );
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    origin:
-      process.env.CORS_ORIGIN ||
-      "https://equivalve-subreputable-keiko.ngrok-free.dev",
+    origin: [
+      "http://localhost:3000", // Cho phép Localhost
+      "https://equivalve-subreputable-keiko.ngrok-free.dev", // Cho phép Ngrok
+      process.env.CORS_ORIGIN, // Cho phép thêm từ biến môi trường (nếu có)
+    ].filter(Boolean), // Lọc bỏ giá trị null/undefined nếu biến env không tồn tại
     credentials: true,
   })
 );
