@@ -151,11 +151,6 @@ export default function PostCard({
           {post.title}
         </h2>
 
-        {/* Excerpt */}
-        {excerpt && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{excerpt}</p>
-        )}
-
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">

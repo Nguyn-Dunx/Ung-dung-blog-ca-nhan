@@ -1,7 +1,8 @@
 import axios from "axios";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || `${process.env.NEXT_PUBLIC_API_URL}`;
+// Luôn dùng "/api" để Next.js Rewrites hoạt động
+const API_BASE_URL = "/api";
+// const API_BASE_URL =
+//   process.env.NEXT_PUBLIC_API_URL || `${process.env.NEXT_PUBLIC_API_URL}`;
 
 // Create axios instance with default config
 const api = axios.create({
