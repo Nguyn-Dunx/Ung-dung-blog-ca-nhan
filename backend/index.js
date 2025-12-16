@@ -34,7 +34,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000", // Cho phép Localhost
-      "https://equivalve-subreputable-keiko.ngrok-free.dev", // Cho phép Ngrok
+      "https://ung-dung-blog-ca-nhan-fit.vercel.app", // Cho phép Ngrok
       process.env.CORS_ORIGIN, // Cho phép thêm từ biến môi trường (nếu có)
     ].filter(Boolean), // Lọc bỏ giá trị null/undefined nếu biến env không tồn tại
     credentials: true,
