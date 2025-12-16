@@ -42,6 +42,7 @@
 // app/page.tsx
 import { Post } from "@/lib/types";
 import PostList from "@/components/common/posts/PostList";
+//export const dynamic = "force-dynamic";
 import { cookies } from "next/headers";
 
 // Server Component – gọi API backend
