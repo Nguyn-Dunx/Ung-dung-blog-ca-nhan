@@ -38,8 +38,8 @@ const register = async (req, res, next) => {
     // Cấu hình cookie an toàn hơn
     res.cookie("token", token, {
       httpOnly: true, // Quan trọng: JS ở client không đọc được (chống XSS)
-      secure: false, // false nếu chạy localhost (http), true nếu chạy https (deploy)
-      sameSite: "strict", // Chống CSRF cơ bản
+      secure: true, // false nếu chạy localhost (http), true nếu chạy https (deploy)
+      sameSite: "none", // Chống CSRF cơ bản
       maxAge: 24 * 60 * 60 * 1000, // 1 ngày (tính bằng mili giây)
     });
 
