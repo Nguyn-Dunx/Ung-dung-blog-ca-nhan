@@ -3,6 +3,17 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+function getAuthCookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    maxAge: 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+}
+
 // --- HÀM ĐĂNG KÝ ---
 const register = async (req, res, next) => {
   try {
@@ -35,13 +46,7 @@ const register = async (req, res, next) => {
       expiresIn: process.env.JWT_EXPIRES_IN || "1d",
     });
 
-    // Cấu hình cookie an toàn hơn
-    res.cookie("token", token, {
-      httpOnly: true, // Quan trọng: JS ở client không đọc được (chống XSS)
-      secure: true, // false nếu chạy localhost (http), true nếu chạy https (deploy)
-      sameSite: "none", // Chống CSRF cơ bản
-      maxAge: 24 * 60 * 60 * 1000, // 1 ngày (tính bằng mili giây)
-    });
+    res.cookie("token", token, getAuthCookieOptions());
 
     res.status(201).json({
       message: "User created",
@@ -81,13 +86,7 @@ const login = async (req, res, next) => {
       expiresIn: process.env.JWT_EXPIRES_IN || "1d", //thời hạn token
     });
 
-    // Cấu hình cookie an toàn hơn
-    res.cookie("token", token, {
-      httpOnly: true, // Quan trọng: JS ở client không đọc được (chống XSS)
-      secure: true, // false nếu chạy localhost (http), true nếu chạy https (deploy)
-      sameSite: "none", // Chống CSRF cơ bản
-      maxAge: 24 * 60 * 60 * 1000, // 1 ngày (tính bằng mili giây)
-    });
+    res.cookie("token", token, getAuthCookieOptions());
 
     res.json({
       message: "Login success",
@@ -106,7 +105,7 @@ const login = async (req, res, next) => {
 };
 // --- HÀM ĐĂNG XUẤT ---
 const logout = (req, res) => {
-  res.clearCookie("token"); // Xóa cookie tên là "token"
+  res.clearCookie("token", getAuthCookieOptions());
   res.status(200).json({ message: "Logged out successfully" });
 };
 

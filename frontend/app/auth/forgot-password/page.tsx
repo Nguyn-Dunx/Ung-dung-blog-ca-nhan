@@ -36,19 +36,16 @@ export default function ForgotPassword() {
       setSuccess(null);
       setTempPassword(null);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/forget-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: data.username,
-            email: data.email,
-          }),
-        }
-      );
+      const res = await fetch(`/api/auth/forget-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: data.username,
+          email: data.email,
+        }),
+      });
 
       const json = await res.json();
 

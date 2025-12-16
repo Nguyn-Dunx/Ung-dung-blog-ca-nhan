@@ -32,7 +32,10 @@ export default function Login() {
       setLoading(true);
       setServerError(null);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+      // IMPORTANT (deploy): call same-origin /api so Next rewrites can proxy
+      // and Set-Cookie becomes first-party (Vercel domain), allowing Next SSR
+      // to read the token cookie via next/headers.
+      const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

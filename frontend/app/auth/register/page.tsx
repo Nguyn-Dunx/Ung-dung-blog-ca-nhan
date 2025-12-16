@@ -70,15 +70,14 @@ export default function Register() {
         formData.append("avatar", avatarFile);
       }
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
-        {
-          method: "POST",
-          // KHÔNG set Content-Type header khi gửi FormData, browser sẽ tự set
-          credentials: "include", // QUAN TRỌNG: để browser nhận httpOnly cookie
-          body: formData,
-        }
-      );
+      // IMPORTANT (deploy): call same-origin /api so Next rewrites can proxy
+      // and Set-Cookie becomes first-party (frontend domain).
+      const res = await fetch(`/api/auth/register`, {
+        method: "POST",
+        // KHÔNG set Content-Type header khi gửi FormData, browser sẽ tự set
+        credentials: "include", // QUAN TRỌNG: để browser nhận httpOnly cookie
+        body: formData,
+      });
 
       const json = await res.json();
 
