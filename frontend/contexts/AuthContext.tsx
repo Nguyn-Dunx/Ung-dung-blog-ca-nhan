@@ -1,8 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User } from "@/lib/types";
-import { authAPI } from "@/lib/api";
+import { User } from "@/lib/types"; // Đảm bảo đường dẫn import đúng
+import { authAPI } from "@/lib/api"; // Đảm bảo đường dẫn import đúng
 import { useRouter } from "next/navigation";
 
 interface AuthContextType {
@@ -21,6 +21,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Hàm helper để lấy thông báo lỗi sạch đẹp
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "object" && err !== null && "response" in err) {
@@ -41,8 +42,8 @@ export function AuthProvider({
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ IMPORTANT: keep client state in sync with server-provided user (cookie-based auth)
-  // Without this, after login + router.refresh(), components may still see user=null until full reload.
+  // Đồng bộ State Client với Server
+  // Khi reload trang, initialUser sẽ có dữ liệu mới, cập nhật vào state
   useEffect(() => {
     setUser(initialUser ?? null);
   }, [initialUser]);
@@ -50,15 +51,19 @@ export function AuthProvider({
   const login = async (emailOrUsername: string, password: string) => {
     setLoading(true);
     try {
-      const response = await authAPI.login({ emailOrUsername, password });
-      setUser(response.user ?? null);
-      router.push("/");
-      router.refresh();
+      // 1. Gọi API Login (Backend set cookie vào trình duyệt)
+      await authAPI.login({ emailOrUsername, password });
+
+      // 2. QUAN TRỌNG: Sử dụng window.location.href thay vì router.push
+      // Lý do: Ép trình duyệt tải lại trang hoàn toàn để gửi Cookie mới lên Next.js Server
+      // Khắc phục triệt để lỗi "đăng nhập xong phải F5 mới nhận"
+      window.location.href = "/";
     } catch (err: unknown) {
-      throw new Error(getErrorMessage(err) || "Login failed");
-    } finally {
+      // Nếu lỗi thì tắt loading để user thử lại
       setLoading(false);
+      throw new Error(getErrorMessage(err) || "Login failed");
     }
+    // Không cần finally setLoading(false) ở đây vì trang sẽ reload ngay
   };
 
   const register = async (data: {
@@ -69,14 +74,12 @@ export function AuthProvider({
   }) => {
     setLoading(true);
     try {
-      const response = await authAPI.register(data);
-      setUser(response.user ?? null);
-      router.push("/");
-      router.refresh();
+      await authAPI.register(data);
+      // Tương tự login: Reload để nhận diện user mới
+      window.location.href = "/";
     } catch (err: unknown) {
-      throw new Error(getErrorMessage(err) || "Registration failed");
-    } finally {
       setLoading(false);
+      throw new Error(getErrorMessage(err) || "Registration failed");
     }
   };
 
@@ -84,12 +87,10 @@ export function AuthProvider({
     setLoading(true);
     try {
       await authAPI.logout();
-      setUser(null);
-      router.push("/");
-      router.refresh();
+      // Reload để xóa sạch trạng thái và cookie cũ
+      window.location.href = "/auth/login";
     } catch (err: unknown) {
       console.error("Logout error:", err);
-    } finally {
       setLoading(false);
     }
   };
