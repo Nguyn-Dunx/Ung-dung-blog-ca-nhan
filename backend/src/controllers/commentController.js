@@ -7,7 +7,7 @@ const addComment = async (req, res, next) => {
     const postId = req.params.postId;
 
     // 1. Kiểm tra Post tồn tại
-    const post = await Post.findById(postId);
+    const post = await Post.findOne({ _id: postId, isDeleted: false });
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     // 2. Tạo comment
@@ -28,7 +28,17 @@ const addComment = async (req, res, next) => {
 
 const getComments = async (req, res, next) => {
   try {
-    const comments = await Comment.find({ post: req.params.postId })
+    // Optional safety: if post is deleted, treat as not found
+    const post = await Post.findOne({
+      _id: req.params.postId,
+      isDeleted: false,
+    });
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const comments = await Comment.find({
+      post: req.params.postId,
+      isDeleted: false,
+    })
       // Lấy thêm fullName và avatar để hiển thị cho đẹp
       .populate("user", "username fullName avatar")
       .sort({ createdAt: -1 }); // Mới nhất lên đầu
@@ -41,7 +51,10 @@ const getComments = async (req, res, next) => {
 const deleteComment = async (req, res, next) => {
   try {
     // Lưu ý: ID ở đây là ID của Comment, không phải Post
-    const comment = await Comment.findById(req.params.id);
+    const comment = await Comment.findOne({
+      _id: req.params.id,
+      isDeleted: false,
+    });
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     // Lấy thông tin bài viết để kiểm tra tác giả
@@ -63,8 +76,13 @@ const deleteComment = async (req, res, next) => {
         .json({ message: "Bạn không có quyền xóa bình luận này" });
     }
 
-    await comment.deleteOne();
-    res.json({ message: "Comment deleted" });
+    // Soft delete
+    comment.isDeleted = true;
+    comment.deletedAt = new Date();
+    comment.deletedBy = req.user.id;
+    await comment.save();
+
+    res.json({ message: "Comment deleted (soft)" });
   } catch (err) {
     next(err);
   }
@@ -82,7 +100,7 @@ const updateComment = async (req, res, next) => {
     }
 
     //  Tìm comment trong DB
-    const comment = await Comment.findById(commentId);
+    const comment = await Comment.findOne({ _id: commentId, isDeleted: false });
     if (!comment) {
       return res.status(404).json({ message: "Comment not found" });
     }

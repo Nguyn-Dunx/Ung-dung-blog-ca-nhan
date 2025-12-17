@@ -52,7 +52,7 @@ const getPosts = async (req, res, next) => {
     const tag = req.query.tag || "";
 
     // 2. Xây dựng bộ lọc (Filter)
-    const query = {};
+    const query = { isDeleted: false };
 
     // Tìm kiếm theo Title (không phân biệt hoa thường - regex 'i')
     if (search) {
@@ -84,7 +84,7 @@ const getPosts = async (req, res, next) => {
     const Comment = require("../models/Comment");
     const postIds = posts.map((p) => p._id);
     const commentCounts = await Comment.aggregate([
-      { $match: { post: { $in: postIds } } },
+      { $match: { post: { $in: postIds }, isDeleted: false } },
       { $group: { _id: "$post", count: { $sum: 1 } } },
     ]);
 
@@ -119,8 +119,8 @@ const getPosts = async (req, res, next) => {
 const getPost = async (req, res, next) => {
   try {
     // Tìm bài viết và tăng view lên 1 luôn
-    const post = await Post.findByIdAndUpdate(
-      req.params.id,
+    const post = await Post.findOneAndUpdate(
+      { _id: req.params.id, isDeleted: false },
       { $inc: { views: 1 } }, //Tăng views thêm 1
       { new: true } //Trả về dữ liệu mới sau khi tăng (thay vì dữ liệu cũ)
     ).populate("author", "username fullName email avatar");
@@ -135,7 +135,7 @@ const getPost = async (req, res, next) => {
 
 const updatePost = async (req, res, next) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const post = await Post.findOne({ _id: req.params.id, isDeleted: false });
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     // owner or admin
@@ -181,24 +181,33 @@ const updatePost = async (req, res, next) => {
 
 const deletePost = async (req, res, next) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const post = await Post.findOne({ _id: req.params.id, isDeleted: false });
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.author.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // Xóa ảnh trên cloud
-    if (post.imageId) {
-      await cloudinary.uploader.destroy(post.imageId);
-    }
+    // Soft delete: keep record for audit/tracing
+    post.isDeleted = true;
+    post.deletedAt = new Date();
+    post.deletedBy = req.user.id;
+    await post.save();
 
-    // Xóa tất cả comments của bài viết
+    // Soft delete all comments under this post as well
     const Comment = require("../models/Comment");
-    await Comment.deleteMany({ post: req.params.id });
+    await Comment.updateMany(
+      { post: req.params.id, isDeleted: false },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: req.user.id,
+        },
+      }
+    );
 
-    await post.deleteOne();
-    res.json({ message: "Post deleted" });
+    res.json({ message: "Post deleted (soft)" });
   } catch (err) {
     next(err);
   }
@@ -206,7 +215,7 @@ const deletePost = async (req, res, next) => {
 
 const likePost = async (req, res, next) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const post = await Post.findOne({ _id: req.params.id, isDeleted: false });
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     // Kiểm tra xem user hiện tại đã like bài này chưa

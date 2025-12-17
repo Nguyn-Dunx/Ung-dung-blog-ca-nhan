@@ -289,11 +289,29 @@ const deleteUser = async (req, res, next) => {
     const Post = require("../models/Post");
     const Comment = require("../models/Comment");
 
-    // Xóa tất cả comments của user
-    await Comment.deleteMany({ user: userId });
+    // Soft delete all comments of this user
+    await Comment.updateMany(
+      { user: userId, isDeleted: false },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: req.user.id,
+        },
+      }
+    );
 
-    // Xóa tất cả posts của user
-    await Post.deleteMany({ author: userId });
+    // Soft delete all posts of this user
+    await Post.updateMany(
+      { author: userId, isDeleted: false },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: req.user.id,
+        },
+      }
+    );
 
     // Xóa user
     await user.deleteOne();
