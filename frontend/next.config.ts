@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+// Expect value like: http://localhost:5000/api or https://<host>/api
+const backendApiUrl =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
@@ -33,7 +37,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*", // Khi code frontend gọi: /api/auth/login...
-        destination: "https://ung-dung-blog-ca-nhan.onrender.com/api/:path*", // ...sẽ nối sang server Render
+        destination: `${backendApiUrl}/:path*`, // ...sẽ nối sang backend (local/prod theo env)
       },
     ];
   },

@@ -14,11 +14,20 @@ import {
   Edit2,
   Trash2,
   Loader2,
+  Shield,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+
+function getHttpStatus(err: unknown): number | undefined {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const e = err as { response?: { status?: number } };
+    return e.response?.status;
+  }
+  return undefined;
+}
 
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
@@ -52,6 +61,7 @@ export default function PostDetailClient({
   // --- STATES ---
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [showDeletedComments, setShowDeletedComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
@@ -71,14 +81,25 @@ export default function PostDetailClient({
   const loadComments = async () => {
     try {
       setCommentsLoading(true);
-      const data = await commentsAPI.getComments(post._id);
-      setComments(data);
+
+      const data =
+        effectiveRole === "admin"
+          ? await commentsAPI.getAdminComments(post._id)
+          : await commentsAPI.getComments(post._id);
+
+      setComments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading comments:", error);
+      setComments([]);
     } finally {
       setCommentsLoading(false);
     }
   };
+
+  const visibleComments =
+    effectiveRole === "admin" && showDeletedComments
+      ? comments
+      : comments.filter((c) => !c.isDeleted);
 
   // --- LIKE ---
   const handleLike = async () => {
@@ -96,7 +117,7 @@ export default function PostDetailClient({
       }));
 
       await postsAPI.likePost(post._id);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error liking post:", error);
       setLiked(!liked);
       setPost((prev) => ({ ...prev, likes: initialPost.likes }));
@@ -113,9 +134,9 @@ export default function PostDetailClient({
       const comment = await commentsAPI.addComment(post._id, newComment);
       setComments([comment, ...comments]);
       setNewComment("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding comment:", error);
-      if (error.response?.status === 401) router.push("/auth/login");
+      if (getHttpStatus(error) === 401) router.push("/auth/login");
     } finally {
       setLoading(false);
     }
@@ -266,8 +287,41 @@ export default function PostDetailClient({
         <Card>
           <CardContent className="pt-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Comments ({comments.length})
+              Comments ({visibleComments.length})
             </h2>
+
+            {/* Admin toggle */}
+            {effectiveRole === "admin" && (
+              <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border bg-gray-50 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <Shield className="w-4 h-4 text-gray-500" />
+                  <span className="font-medium">Bình luận đã xoá</span>
+                  <span className="text-gray-500">
+                    ({comments.filter((c) => c.isDeleted).length})
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showDeletedComments}
+                  onClick={() => setShowDeletedComments((v) => !v)}
+                  className={
+                    "relative inline-flex h-6 w-11 items-center rounded-full border transition-colors " +
+                    (showDeletedComments
+                      ? "bg-indigo-600 border-indigo-600"
+                      : "bg-gray-200 border-gray-200")
+                  }
+                >
+                  <span
+                    className={
+                      "inline-block h-5 w-5 transform rounded-full bg-white transition-transform " +
+                      (showDeletedComments ? "translate-x-5" : "translate-x-1")
+                    }
+                  />
+                </button>
+              </div>
+            )}
 
             {/* Add comment */}
             <div className="mb-6">
@@ -298,11 +352,11 @@ export default function PostDetailClient({
               <div className="flex justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               </div>
-            ) : comments.length === 0 ? (
+            ) : visibleComments.length === 0 ? (
               <p className="text-center text-gray-500 py-8">No comments yet.</p>
             ) : (
               <div className="space-y-4">
-                {comments.map((comment) => (
+                {visibleComments.map((comment) => (
                   <div
                     key={comment._id}
                     className="border-b border-gray-200 pb-4 last:border-0"
@@ -337,33 +391,49 @@ export default function PostDetailClient({
                               {formatDateTime(comment.createdAt)}
                               {comment.isEdited && " (edited)"}
                             </span>
+
+                            {comment.isDeleted && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
+                                Đã xoá bởi User (
+                                {typeof comment.deletedBy === "object" &&
+                                comment.deletedBy
+                                  ? comment.deletedBy.fullName ||
+                                    comment.deletedBy.username
+                                  : "-"}
+                                )
+                              </span>
+                            )}
                           </div>
 
                           {/* Edit/Delete */}
                           <div className="flex gap-1">
-                            {effectiveUserId === comment.user._id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startEditComment(comment)}
-                                className="h-8 px-2"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </Button>
-                            )}
+                            {!comment.isDeleted &&
+                              effectiveUserId === comment.user._id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEditComment(comment)}
+                                  className="h-8 px-2"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                              )}
 
-                            {(effectiveUserId === comment.user._id ||
-                              effectiveRole === "admin" ||
-                              post.author._id === effectiveUserId) && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteComment(comment._id)}
-                                className="h-8 px-2 text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
+                            {!comment.isDeleted &&
+                              (effectiveUserId === comment.user._id ||
+                                effectiveRole === "admin" ||
+                                post.author._id === effectiveUserId) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteComment(comment._id)
+                                  }
+                                  className="h-8 px-2 text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                           </div>
                         </div>
 
@@ -397,7 +467,14 @@ export default function PostDetailClient({
                             </div>
                           </div>
                         ) : (
-                          <p className="text-gray-700">{comment.content}</p>
+                          <p
+                            className={
+                              "text-gray-700 " +
+                              (comment.isDeleted ? "opacity-50 italic" : "")
+                            }
+                          >
+                            {comment.content}
+                          </p>
                         )}
                       </div>
                     </div>

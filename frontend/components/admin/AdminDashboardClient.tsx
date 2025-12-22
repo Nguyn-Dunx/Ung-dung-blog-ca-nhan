@@ -9,6 +9,7 @@ import {
   Loader2,
   Edit2,
   Trash2,
+  Undo2,
   Eye,
   Heart,
   Users,
@@ -18,7 +19,15 @@ import {
   UserX,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const e = err as { response?: { data?: { message?: string } } };
+    return e.response?.data?.message || "Request failed";
+  }
+  return "Request failed";
+}
 
 interface User {
   _id: string;
@@ -31,6 +40,14 @@ interface User {
 }
 
 type TabType = "posts" | "users";
+type PostsScope = "all" | "admin" | "trash";
+
+function formatDateTime(dateStr?: string | null) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString();
+}
 
 export default function AdminDashboardClient({
   userId,
@@ -38,34 +55,37 @@ export default function AdminDashboardClient({
   userId: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<TabType>("posts");
+  const [postsScope, setPostsScope] = useState<PostsScope>("all");
   const [posts, setPosts] = useState<Post[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [forceDeletingId, setForceDeletingId] = useState<string | null>(null);
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     if (activeTab === "posts") {
-      loadPosts();
+      loadPosts(postsScope);
     } else {
       loadUsers();
     }
-  }, [activeTab]);
+  }, [activeTab, postsScope]);
 
-  const loadPosts = async () => {
+  const loadPosts = async (scope: PostsScope) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await postsAPI.getPosts();
+
+      // Admin dashboard always uses admin endpoint so we can support Trash.
+      const response = await postsAPI.getAdminPosts({ scope });
       const postsData = response.data || response.posts || response;
-      const allPosts = Array.isArray(postsData) ? postsData : [];
-      setPosts(allPosts);
-    } catch (err: any) {
+      setPosts(Array.isArray(postsData) ? postsData : []);
+    } catch (err: unknown) {
       console.error("Error loading posts:", err);
-      setError("Failed to load posts");
+      setError(getErrorMessage(err) || "Failed to load posts");
       setPosts([]);
     } finally {
       setLoading(false);
@@ -78,9 +98,9 @@ export default function AdminDashboardClient({
       setError(null);
       const data = await adminAPI.getUsers();
       setUsers(Array.isArray(data) ? data : []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error loading users:", err);
-      setError("Failed to load users");
+      setError(getErrorMessage(err) || "Failed to load users");
       setUsers([]);
     } finally {
       setLoading(false);
@@ -105,8 +125,8 @@ export default function AdminDashboardClient({
             : u
         )
       );
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to change role";
+    } catch (err: unknown) {
+      const errorMsg = getErrorMessage(err) || "Failed to change role";
       setError(errorMsg);
       alert(errorMsg);
     } finally {
@@ -133,8 +153,8 @@ export default function AdminDashboardClient({
       setDeletingUserId(targetUserId);
       await adminAPI.deleteUser(targetUserId);
       setUsers(users.filter((u) => u._id !== targetUserId));
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to delete user";
+    } catch (err: unknown) {
+      const errorMsg = getErrorMessage(err) || "Failed to delete user";
       setError(errorMsg);
       alert(errorMsg);
     } finally {
@@ -149,12 +169,48 @@ export default function AdminDashboardClient({
       setDeletingId(id);
       await postsAPI.deletePost(id);
       setPosts(posts.filter((p) => p._id !== id));
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to delete post";
+    } catch (err: unknown) {
+      const errorMsg = getErrorMessage(err) || "Failed to delete post";
       setError(errorMsg);
       alert(errorMsg);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleRestorePost = async (id: string) => {
+    if (!confirm("Khôi phục bài viết này?")) return;
+
+    try {
+      setRestoringId(id);
+      await postsAPI.restorePost(id);
+      // Remove from trash list
+      setPosts((prev) => prev.filter((p) => p._id !== id));
+    } catch (err: unknown) {
+      const errorMsg = getErrorMessage(err) || "Failed to restore post";
+      setError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  const handleForceDeletePost = async (id: string) => {
+    if (!confirm("Xóa vĩnh viễn bài viết này? Hành động không thể hoàn tác.")) {
+      return;
+    }
+
+    try {
+      setForceDeletingId(id);
+      await postsAPI.forceDeletePost(id);
+      setPosts((prev) => prev.filter((p) => p._id !== id));
+    } catch (err: unknown) {
+      const errorMsg =
+        getErrorMessage(err) || "Failed to permanently delete post";
+      setError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setForceDeletingId(null);
     }
   };
 
@@ -225,10 +281,42 @@ export default function AdminDashboardClient({
               </Button>
             </div>
 
+            {/* Posts scopes */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              <Button
+                variant={postsScope === "all" ? "default" : "outline"}
+                onClick={() => setPostsScope("all")}
+                className="flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Tất cả
+              </Button>
+              <Button
+                variant={postsScope === "admin" ? "default" : "outline"}
+                onClick={() => setPostsScope("admin")}
+                className="flex items-center gap-2"
+              >
+                <Shield className="w-4 h-4" />
+                Bài viết của Admin
+              </Button>
+              <Button
+                variant={postsScope === "trash" ? "default" : "outline"}
+                onClick={() => setPostsScope("trash")}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Thùng rác
+              </Button>
+            </div>
+
             {posts.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <p className="text-gray-500 mb-4">No posts found</p>
+                  <p className="text-gray-500 mb-4">
+                    {postsScope === "trash"
+                      ? "Thùng rác trống"
+                      : "Không có bài viết"}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -301,36 +389,94 @@ export default function AdminDashboardClient({
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                          className="flex-1"
-                        >
-                          <Link href={`/posts/${post._id}`}>
-                            <Eye className="w-4 h-4 mr-1" />
-                            View
-                          </Link>
-                        </Button>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/posts/${post._id}/edit`}>
-                            <Edit2 className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeletePost(post._id)}
-                          disabled={deletingId === post._id}
-                        >
-                          {deletingId === post._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </div>
+                      {postsScope === "trash" ? (
+                        <div className="space-y-3">
+                          <div className="rounded-md border bg-gray-50 p-3 text-xs text-gray-700">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">Ngày xoá</span>
+                              <span>
+                                {formatDateTime(post.deletedAt ?? null) || "-"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 mt-1">
+                              <span className="font-medium">Người xoá</span>
+                              <span>
+                                {typeof post.deletedBy === "object" &&
+                                post.deletedBy
+                                  ? post.deletedBy.fullName ||
+                                    post.deletedBy.username
+                                  : "-"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRestorePost(post._id)}
+                              disabled={
+                                restoringId === post._id ||
+                                forceDeletingId === post._id
+                              }
+                              className="flex-1"
+                            >
+                              {restoringId === post._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Undo2 className="w-4 h-4" />
+                              )}
+                              Khôi phục
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleForceDeletePost(post._id)}
+                              disabled={
+                                forceDeletingId === post._id ||
+                                restoringId === post._id
+                              }
+                            >
+                              {forceDeletingId === post._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                            className="flex-1"
+                          >
+                            <Link href={`/posts/${post._id}`}>
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Link>
+                          </Button>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/posts/${post._id}/edit`}>
+                              <Edit2 className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeletePost(post._id)}
+                            disabled={deletingId === post._id}
+                          >
+                            {deletingId === post._id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

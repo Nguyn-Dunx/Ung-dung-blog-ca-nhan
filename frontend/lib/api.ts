@@ -92,6 +92,24 @@ export const postsAPI = {
     return response.data;
   },
 
+  // Admin: list posts (all|admin|trash)
+  getAdminPosts: async (params?: { scope?: "all" | "admin" | "trash" }) => {
+    const response = await api.get("/posts/admin", { params });
+    return response.data;
+  },
+
+  // Admin: restore a soft-deleted post
+  restorePost: async (id: string) => {
+    const response = await api.put(`/posts/${id}/restore`);
+    return response.data;
+  },
+
+  // Admin: permanently delete a soft-deleted post
+  forceDeletePost: async (id: string) => {
+    const response = await api.delete(`/posts/${id}/force`);
+    return response.data;
+  },
+
   likePost: async (id: string) => {
     const response = await api.put(`/posts/${id}/like`);
     return response.data;
@@ -102,6 +120,12 @@ export const postsAPI = {
 export const commentsAPI = {
   getComments: async (postId: string) => {
     const response = await api.get(`/posts/${postId}/comments`);
+    return response.data;
+  },
+
+  // Admin: include deleted comments
+  getAdminComments: async (postId: string) => {
+    const response = await api.get(`/posts/${postId}/comments/admin`);
     return response.data;
   },
 

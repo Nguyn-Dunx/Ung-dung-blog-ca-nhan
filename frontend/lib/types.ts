@@ -24,6 +24,11 @@ export type Post = {
   commentCount?: number;
   createdAt: string;
   updatedAt: string;
+
+  // Soft delete
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedBy?: Author | string | null;
 };
 
 // Comment types
@@ -35,6 +40,11 @@ export type Comment = {
   isEdited: boolean;
   createdAt: string;
   updatedAt: string;
+
+  // Soft delete
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedBy?: Author | string | null;
 };
 
 // API Response types
