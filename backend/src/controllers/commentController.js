@@ -48,6 +48,27 @@ const getComments = async (req, res, next) => {
   }
 };
 
+// --- ADMIN: GET COMMENTS (INCLUDE DELETED) ---
+// GET /api/posts/:postId/comments/admin
+const getCommentsAdmin = async (req, res, next) => {
+  try {
+    const post = await Post.findOne({
+      _id: req.params.postId,
+      isDeleted: false,
+    });
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const comments = await Comment.find({ post: req.params.postId })
+      .populate("user", "username fullName avatar")
+      .populate("deletedBy", "username fullName avatar")
+      .sort({ createdAt: -1 });
+
+    res.json(comments);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const deleteComment = async (req, res, next) => {
   try {
     // Lưu ý: ID ở đây là ID của Comment, không phải Post
@@ -132,6 +153,7 @@ const updateComment = async (req, res, next) => {
 module.exports = {
   addComment,
   getComments,
+  getCommentsAdmin,
   deleteComment,
   updateComment,
 };

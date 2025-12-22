@@ -1,6 +1,7 @@
 const Post = require("../models/Post");
 // Import thêm cloudinary nếu cần dùng hàm xóa ảnh cũ
 const cloudinary = require("cloudinary").v2;
+const User = require("../models/User");
 
 const createPost = async (req, res, next) => {
   try {
@@ -243,6 +244,97 @@ const likePost = async (req, res, next) => {
   }
 };
 
+// --- ADMIN: LIST POSTS (ALL | ADMIN | TRASH) ---
+// GET /api/posts/admin?scope=all|admin|trash
+const getAdminPosts = async (req, res, next) => {
+  try {
+    const scope = (req.query.scope || "all").toString();
+
+    let query = {};
+    let sort = { createdAt: -1 };
+
+    if (scope === "trash") {
+      query = { isDeleted: true };
+      sort = { deletedAt: -1 };
+    } else if (scope === "admin") {
+      const adminUsers = await User.find({ role: "admin" }).select("_id");
+      const adminIds = adminUsers.map((u) => u._id);
+      query = { isDeleted: false, author: { $in: adminIds } };
+    } else {
+      query = { isDeleted: false };
+    }
+
+    const posts = await Post.find(query)
+      .populate("author", "username fullName email avatar role")
+      .populate("deletedBy", "username fullName email avatar role")
+      .sort(sort)
+      .select("-content");
+
+    res.json({ success: true, data: posts });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --- ADMIN: RESTORE POST ---
+// PUT /api/posts/:id/restore
+const restorePost = async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (!post.isDeleted) {
+      return res.status(400).json({ message: "Post is not deleted" });
+    }
+
+    post.isDeleted = false;
+    post.deletedAt = null;
+    post.deletedBy = null;
+    await post.save();
+
+    // Restore comments under this post
+    const Comment = require("../models/Comment");
+    await Comment.updateMany(
+      { post: req.params.id, isDeleted: true },
+      { $set: { isDeleted: false, deletedAt: null, deletedBy: null } }
+    );
+
+    res.json({ message: "Post restored" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --- ADMIN: PERMANENT DELETE POST ---
+// DELETE /api/posts/:id/force
+const forceDeletePost = async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (!post.isDeleted) {
+      return res
+        .status(400)
+        .json({ message: "Only deleted posts can be permanently removed" });
+    }
+
+    // Remove image from cloudinary if exists
+    if (post.imageId) {
+      try {
+        await cloudinary.uploader.destroy(post.imageId);
+      } catch (e) {
+        // ignore cloudinary failures, continue hard delete
+      }
+    }
+
+    const Comment = require("../models/Comment");
+    await Comment.deleteMany({ post: req.params.id });
+    await post.deleteOne();
+
+    res.json({ message: "Post permanently deleted" });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createPost,
   getPosts,
@@ -250,4 +342,7 @@ module.exports = {
   updatePost,
   deletePost,
   likePost,
+  getAdminPosts,
+  restorePost,
+  forceDeletePost,
 };
