@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Post, Comment } from "@/lib/types";
+import { useState, useEffect, useCallback } from "react";
+import { Post, Comment, CommentEditHistoryEntry } from "@/lib/types";
 import { commentsAPI, postsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,16 +69,17 @@ export default function PostDetailClient({
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [liked, setLiked] = useState(false);
 
-  // --- LOAD COMMENTS + LIKE STATUS ---
-  useEffect(() => {
-    loadComments();
+  const [openHistoryByCommentId, setOpenHistoryByCommentId] = useState<
+    Record<string, boolean>
+  >({});
+  const [historyByCommentId, setHistoryByCommentId] = useState<
+    Record<string, CommentEditHistoryEntry[]>
+  >({});
+  const [historyLoadingByCommentId, setHistoryLoadingByCommentId] = useState<
+    Record<string, boolean>
+  >({});
 
-    if (effectiveUserId && initialPost.likes) {
-      setLiked(initialPost.likes.includes(effectiveUserId));
-    }
-  }, [post._id, effectiveUserId, initialPost.likes]);
-
-  const loadComments = async () => {
+  const loadComments = useCallback(async () => {
     try {
       setCommentsLoading(true);
 
@@ -94,7 +95,16 @@ export default function PostDetailClient({
     } finally {
       setCommentsLoading(false);
     }
-  };
+  }, [effectiveRole, post._id]);
+
+  // --- LOAD COMMENTS + LIKE STATUS ---
+  useEffect(() => {
+    loadComments();
+
+    if (effectiveUserId && initialPost.likes) {
+      setLiked(initialPost.likes.includes(effectiveUserId));
+    }
+  }, [loadComments, post._id, effectiveUserId, initialPost.likes]);
 
   const visibleComments =
     effectiveRole === "admin" && showDeletedComments
@@ -157,6 +167,14 @@ export default function PostDetailClient({
       setComments(
         comments.map((c) => (c._id === commentId ? updatedComment : c))
       );
+
+      // Invalidate cached history so next open shows latest
+      setHistoryByCommentId((prev) => {
+        const next = { ...prev };
+        delete next[commentId];
+        return next;
+      });
+
       setEditingCommentId(null);
       setEditingContent("");
     } catch (error) {
@@ -181,6 +199,36 @@ export default function PostDetailClient({
   const startEditComment = (comment: Comment) => {
     setEditingCommentId(comment._id);
     setEditingContent(comment.content);
+  };
+
+  const toggleHistory = async (commentId: string) => {
+    setOpenHistoryByCommentId((prev) => ({
+      ...prev,
+      [commentId]: !prev[commentId],
+    }));
+
+    // Fetch once (on first open)
+    if (historyByCommentId[commentId]) return;
+
+    try {
+      setHistoryLoadingByCommentId((prev) => ({
+        ...prev,
+        [commentId]: true,
+      }));
+      const data = await commentsAPI.getCommentHistory(post._id, commentId);
+      setHistoryByCommentId((prev) => ({
+        ...prev,
+        [commentId]: Array.isArray(data) ? data : [],
+      }));
+    } catch (error) {
+      console.error("Error loading comment history:", error);
+      setHistoryByCommentId((prev) => ({ ...prev, [commentId]: [] }));
+    } finally {
+      setHistoryLoadingByCommentId((prev) => ({
+        ...prev,
+        [commentId]: false,
+      }));
+    }
   };
 
   return (
@@ -475,6 +523,57 @@ export default function PostDetailClient({
                           >
                             {comment.content}
                           </p>
+                        )}
+
+                        {/* Edit history (public) */}
+                        {!comment.isDeleted && comment.isEdited && (
+                          <div className="mt-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-gray-600"
+                              onClick={() => toggleHistory(comment._id)}
+                            >
+                              {openHistoryByCommentId[comment._id]
+                                ? "Hide edit history"
+                                : "View edit history"}
+                            </Button>
+
+                            {openHistoryByCommentId[comment._id] && (
+                              <div className="mt-2 rounded-lg border bg-gray-50 px-3 py-2">
+                                {historyLoadingByCommentId[comment._id] ? (
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Loading history...</span>
+                                  </div>
+                                ) : (historyByCommentId[comment._id] || [])
+                                    .length === 0 ? (
+                                  <p className="text-sm text-gray-600">
+                                    No history available.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {(historyByCommentId[comment._id] || []).map(
+                                      (h, idx) => (
+                                        <div
+                                          key={`${comment._id}-h-${idx}`}
+                                          className="rounded-md bg-white border px-3 py-2"
+                                        >
+                                          <div className="text-xs text-gray-500 mb-1">
+                                            {formatDateTime(h.editedAt)}
+                                          </div>
+                                          <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                                            {h.content}
+                                          </div>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

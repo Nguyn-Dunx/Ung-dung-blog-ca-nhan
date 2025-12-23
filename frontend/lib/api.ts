@@ -123,6 +123,13 @@ export const commentsAPI = {
     return response.data;
   },
 
+  getCommentHistory: async (postId: string, commentId: string) => {
+    const response = await api.get(
+      `/posts/${postId}/comments/${commentId}/history`
+    );
+    return response.data;
+  },
+
   // Admin: include deleted comments
   getAdminComments: async (postId: string) => {
     const response = await api.get(`/posts/${postId}/comments/admin`);

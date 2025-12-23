@@ -109,6 +109,35 @@ const deleteComment = async (req, res, next) => {
   }
 };
 
+// --- PUBLIC: XEM LỊCH SỬ CHỈNH SỬA COMMENT ---
+// GET /api/posts/:postId/comments/:id/history
+const getCommentHistory = async (req, res, next) => {
+  try {
+    const { postId, id: commentId } = req.params;
+
+    const comment = await Comment.findOne({
+      _id: commentId,
+      post: postId,
+      isDeleted: false,
+    }).populate("editHistory.editedBy", "username fullName avatar");
+
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Trả newest-first cho dễ xem
+    const history = Array.isArray(comment.editHistory)
+      ? [...comment.editHistory].sort(
+          (a, b) => new Date(b.editedAt) - new Date(a.editedAt)
+        )
+      : [];
+
+    res.json(history);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ---  SỬA COMMENT ---
 const updateComment = async (req, res, next) => {
   try {
@@ -133,6 +162,20 @@ const updateComment = async (req, res, next) => {
         .json({ message: "Bạn không có quyền sửa bình luận này" });
     }
 
+    // Nếu nội dung không đổi thì trả luôn (tránh ghi history rỗng)
+    if (comment.content === content) {
+      await comment.populate("user", "username fullName avatar");
+      return res.json(comment);
+    }
+
+    // Lưu lịch sử: lưu bản cũ trước khi ghi đè
+    comment.editHistory = comment.editHistory || [];
+    comment.editHistory.push({
+      content: comment.content,
+      editedAt: new Date(),
+      editedBy: req.user.id,
+    });
+
     //  Cập nhật và lưu
     comment.content = content;
 
@@ -155,5 +198,6 @@ module.exports = {
   getComments,
   getCommentsAdmin,
   deleteComment,
+  getCommentHistory,
   updateComment,
 };

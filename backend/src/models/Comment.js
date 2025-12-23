@@ -1,5 +1,18 @@
 const mongoose = require("mongoose");
 
+const commentEditHistorySchema = new mongoose.Schema(
+  {
+    content: { type: String, required: true, trim: true },
+    editedAt: { type: Date, required: true },
+    editedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
 const commentSchema = new mongoose.Schema(
   {
     post: { type: mongoose.Schema.Types.ObjectId, ref: "Post", required: true },
@@ -8,6 +21,12 @@ const commentSchema = new mongoose.Schema(
     isEdited: {
       type: Boolean,
       default: false,
+    },
+
+    // Lưu lịch sử các lần chỉnh sửa (mọi người đều xem được qua API public)
+    editHistory: {
+      type: [commentEditHistorySchema],
+      default: [],
     },
 
     // Soft delete

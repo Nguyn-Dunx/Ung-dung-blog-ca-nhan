@@ -32,6 +32,12 @@ export type Post = {
 };
 
 // Comment types
+export type CommentEditHistoryEntry = {
+  content: string;
+  editedAt: string;
+  editedBy?: Author | string | null;
+};
+
 export type Comment = {
   _id: string;
   post: string;
@@ -40,6 +46,9 @@ export type Comment = {
   isEdited: boolean;
   createdAt: string;
   updatedAt: string;
+
+  // Not included in list responses by default; fetched via dedicated endpoint
+  editHistory?: CommentEditHistoryEntry[];
 
   // Soft delete
   isDeleted?: boolean;
